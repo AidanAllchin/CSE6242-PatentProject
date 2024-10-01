@@ -1,3 +1,11 @@
+# all data files should be local to avoid clogging up the repo
+data/
+*.csv
+*.xml
+*.tsv
+
+#### TEMPLATE ####
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
