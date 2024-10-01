@@ -22,14 +22,37 @@ project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from colorama import Fore, Style
-import xml.etree.ElementTree as ET
 from typing import List
 import re
 import time
 from tqdm import tqdm
+import json
 
+
+###############################################################################
+#                               CONFIGURATION                                 #
+###############################################################################
+
+
+# Directories
 PATENTS_DIRECTORY = os.path.join(project_root, 'data', 'patents')
-FILE_NAME = "ipa240919.xml"
+CONFIG_PATH = os.path.join(project_root, 'config', 'config.json')
+with open(CONFIG_PATH, 'r') as f:
+    config = json.load(f)
+desired_data_release = config["settings"]["desired_data_release"]
+
+# Structure the 'YYYY-MM-DD' date format to YYMMDD
+desired_data_release = desired_data_release.split("-")
+desired_data_release = desired_data_release[0][2:] + desired_data_release[1] + desired_data_release[2]
+
+# File to split
+FILE_NAME = f"ipa{desired_data_release}.xml"
+
+
+###############################################################################
+#                               XML SPLITTER                                  #
+###############################################################################
+
 
 def extract_patent_id(line):
     """
@@ -151,10 +174,16 @@ def split_xml_by_patent(file_name: str):
     printable_dir = PATENTS_DIRECTORY.replace(str(project_root), '')
     print(f"\n{Style.BRIGHT}{Fore.MAGENTA}[XML Splitter]: Saved {num_in_directory} non-empty patent documents to {printable_dir}.{Style.RESET_ALL}")
 
+
+###############################################################################
+#                                   MAIN                                      #
+###############################################################################
+
+
 if __name__ == '__main__':
-    os.makedirs(PATENTS_DIRECTORY.replace('/patents'), exist_ok=True)
+    os.makedirs(PATENTS_DIRECTORY.replace('/patents', ''), exist_ok=True)
     if not os.path.exists(os.path.join(project_root, 'data', FILE_NAME)):
-        print(f"{Style.BRIGHT}{Fore.RED}[XML Splitter]: {Style.NORMAL}File {FILE_NAME} not found in `data` directory.\n\tPlease download the file from the USPTO website and place it in the `data` directory.{Style.RESET_ALL}")
+        print(f"{Style.BRIGHT}{Fore.RED}[XML Splitter]: {Style.NORMAL}File {FILE_NAME} not found in `data` directory.\n\tPlease run {Style.DIM}__init.py{Style.NORMAL} before trying again.{Style.RESET_ALL}")
         sys.exit(1)
     
     split_xml_by_patent(FILE_NAME)
