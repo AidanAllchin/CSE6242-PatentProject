@@ -6,7 +6,7 @@ GitHub repo for our project.
 
 Current data release date: **2024-09-26**
 
-Data access link: `https://bulkdata.uspto.gov/data/patent/application/redbook/fulltext/`
+Data access link: `https://bulkdata.uspto.gov/data/patent/application/redbook/fulltext/2024/ipa240926.zip`
 
 ## Installation and Setup
 
