@@ -381,5 +381,5 @@ if __name__ == '__main__':
         print(f"{Style.BRIGHT}{Fore.RED}[XML Splitter]: {Style.NORMAL}File {FILE_NAME} not found in `data` directory.\n\tPlease run {Style.DIM}__init.py{Style.NORMAL} before trying again.{Style.RESET_ALL}")
         sys.exit(1)
     
-    #split_xml_by_patent(FILE_NAME)
-    parse_one("20240315157")
+    split_xml_by_patent(FILE_NAME)
+    #parse_one("20240315157")
