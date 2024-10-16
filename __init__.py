@@ -77,9 +77,12 @@ with open(CONFIG_PATH, "r") as f:
     config = json.load(f)
 
 desired_data_release = config["settings"]["desired_data_release"]
+base_link            = config["settings"]["data_link"]
 
 # Structure the 'YYYY-MM-DD' date format to YYMMDD
 desired_data_release = desired_data_release.split("-")
+release_year         = desired_data_release[0]
+assert len(release_year) == 4, "Year must be in 'YYYY' format."
 desired_data_release = desired_data_release[0][2:] + desired_data_release[1] + desired_data_release[2]
 
 # Download the data from the USPTO website
@@ -95,7 +98,7 @@ name = f"ipa{desired_data_release}.zip"
 if not contains_desired:
     print(f"{Fore.YELLOW}[init]: {Style.NORMAL}Data file not found in data directory.{Style.RESET_ALL}")
     print(f"{Fore.YELLOW}{Style.BRIGHT}[init]: {Style.NORMAL}Downloading data from USPTO website...\n{Style.RESET_ALL}")
-    link = f"https://bulkdata.uspto.gov/data/patent/application/redbook/fulltext/2024/{name}"
+    link = f"{base_link}{release_year}/{name}"
     
     sys_type = sys.platform
     if sys_type == "linux":

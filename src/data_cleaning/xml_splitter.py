@@ -50,7 +50,7 @@ FILE_NAME = f"ipa{desired_data_release}.xml"
 
 
 ###############################################################################
-#                               XML SPLITTER                                  #
+#                            Large XML SPLITTER                               #
 ###############################################################################
 
 
@@ -173,6 +173,22 @@ def split_xml_by_patent(file_name: str):
     num_in_directory = len(os.listdir(PATENTS_DIRECTORY))
     printable_dir = PATENTS_DIRECTORY.replace(str(project_root), '')
     print(f"\n{Style.BRIGHT}{Fore.MAGENTA}[XML Splitter]: Saved {num_in_directory} non-empty patent documents to {printable_dir}.{Style.RESET_ALL}")
+
+
+###############################################################################
+#                             INDIVIDUAL PARSER                               #
+###############################################################################
+
+
+def parse_one(file_name: str):
+    """
+    Parses a single patent file to extract the relevant information.
+
+    Args:
+        file_name (str): The name of the patent file to parse.
+    """
+    file_path = os.path.join(PATENTS_DIRECTORY, file_name)
+    pass # TODO
 
 
 ###############################################################################
