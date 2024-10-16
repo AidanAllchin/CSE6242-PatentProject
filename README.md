@@ -5,6 +5,7 @@ GitHub repo for our project.
 ## Details
 
 Current data release date: **2024-09-26**
+
 Data access link: `https://bulkdata.uspto.gov/data/patent/application/redbook/fulltext/`
 
 ## Installation and Setup
