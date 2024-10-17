@@ -22,12 +22,11 @@ project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from colorama import Fore, Style
-from typing import List
+from typing import List, Dict
 import re
 import time
 from tqdm import tqdm
 import json
-from lxml import etree
 
 
 ###############################################################################
@@ -178,199 +177,6 @@ def split_xml_by_patent(file_name: str):
 
 
 ###############################################################################
-#                             INDIVIDUAL PARSER                               #
-###############################################################################
-
-""" Generalized XML structure and tags:
-Patent Name (Invention Title):                   DONE
-<us-patent-application>
- <us-bibliographic-data-application>
-     <invention-title>
-
-
-Assignee (Company):                              DONE
-<us-patent-application>
- <us-bibliographic-data-application>
-     <us-parties>
-         <us-applicants>
-             <us-applicant>
-                 <addressbook>
-                     <orgname>
-                     <address>
-                         <city>
-                         <state>
-                         <country>
-
-Inventors:                                       WIP
-<us-patent-application>
- <us-bibliographic-data-application>
-     <us-parties>
-         <inventors>
-             <inventor> (often multiple)
-                 <addressbook>
-                     <last-name>
-                     <first-name>
-                     <address>
-                         <city>
-                         <state>
-                         <country>
-
-Dates:                                           WIP
-<us-patent-application>
- <us-bibliographic-data-application>
-     <application-reference>
-         <document-id>
-             <date>
- <publication-reference>
-     <document-id>
-         <date>
- date-produced (attribute of <us-patent-application>)
- date-publ (attribute of <us-patent-application>)
-
-Classifications/Industries:                      WIP
-<us-patent-application>
- <us-bibliographic-data-application>
-     <classifications-ipcr>
-         <classification-ipcr>
-             <section>
-             <class>
-             <subclass>
-             <main-group>
-             <subgroup>
-     <classifications-cpc>
-         <main-cpc>
-             <classification-cpc>
-                 <section>
-                 <class>
-                 <subclass>
-                 <main-group>
-                 <subgroup>
-
-Application Number:                              WIP
-<us-patent-application>
- <us-bibliographic-data-application>
-     <application-reference>
-         <document-id>
-             <doc-number>
-
-Document Kind:                                   WIP
-<us-patent-application>
- <us-bibliographic-data-application>
-     <publication-reference>
-         <document-id>
-             <kind>
-
-Application Type:                                WIP
-<us-patent-application>
- <us-bibliographic-data-application>
-     <application-reference appl-type>
-
-
-Other garbage:
-
-Abstract:                                        WIP
-<us-patent-application>
-  <abstract>
-
-Claims:                                          WIP
-<us-patent-application>
-  <claims>
-      <claim>
-
-Description:                                     WIP
-<us-patent-application>
-  <description>
-"""
-
-def extract_patent_name(patent_id: str) -> str:
-    """
-    Extracts the name of the patent from the XML file.
-
-    Args:
-        patent_id (str): The ID of the patent to extract the name for.
-
-    Returns:
-        str: The name of the patent.
-    """
-    file_loc = os.path.join(PATENTS_DIRECTORY, f"patent_{patent_id}.xml")
-    
-    try:
-        tree = etree.parse(file_loc)
-        invention_title = tree.xpath(f"//invention-title")
-        if invention_title:
-            # Shouldn't be more than one but it's returned as a list
-            return invention_title[0].text.strip()
-        else:
-            print(f"{Style.BRIGHT}{Fore.RED}[XML Splitter]: {Style.NORMAL}No invention title found for patent {patent_id}.{Style.RESET_ALL}")
-    except etree.XMLSyntaxError:
-        print(f"{Style.BRIGHT}{Fore.RED}[XML Splitter]: {Style.NORMAL}Error parsing XML file for patent {patent_id}.{Style.RESET_ALL}")
-    return None
-
-def extract_assignee_info(patent_id: str) -> List[dict]:
-    """
-    Extracts assignee information from a patent XML file.
-
-    Args:
-        patent_id (str): The ID of the patent to extract assignee information from.
-
-    Returns:
-        list: A list of dictionaries containing assignee information.
-    """
-    file_loc = os.path.join(PATENTS_DIRECTORY, f"patent_{patent_id}.xml")
-    assignee_info = []
-
-    def parse_assignee(assignee: etree.Element) -> dict:
-        """
-        Cute lil helper function to parse assignee info.
-
-        Args:
-            assignee (etree.Element): The assignee element to parse.
-
-        Returns:
-            dict: The parsed assignee information.
-        """
-        return {
-            "name": assignee.xpath('.//orgname/text()')[0].strip() if assignee.xpath('.//orgname') else None,
-            "city": assignee.xpath('.//city/text()')[0].strip() if assignee.xpath('.//city') else None,
-            "state": assignee.xpath('.//state/text()')[0].strip() if assignee.xpath('.//state') else None,
-            "country": assignee.xpath('.//country/text()')[0].strip() if assignee.xpath('.//country') else None
-        }
-
-    try:
-        tree = etree.parse(file_loc)
-        assignees = tree.xpath(f"//us-applicant")
-        if not assignees:
-            print(f"{Style.BRIGHT}{Fore.RED}[XML Splitter]: {Style.NORMAL}No assignee found for patent {patent_id}.{Style.RESET_ALL}")
-            return None
-        
-        # Loop through all assignees and parse their info
-        for assignee in assignees:
-            assignee_info.append(parse_assignee(assignee))
-        
-        return assignee_info
-    except etree.XMLSyntaxError:
-        print(f"{Style.BRIGHT}{Fore.RED}[XML Splitter]: {Style.NORMAL}Error parsing XML file for patent {patent_id}.{Style.RESET_ALL}")
-    return None
-
-def parse_one(patent_id: str):
-    """
-    Parses a single patent file to extract the relevant information.
-
-    Args:
-        file_name (str): The name of the patent file to parse.
-    """
-    file_path = os.path.join(PATENTS_DIRECTORY, f"patent_{patent_id}.xml")
-    if not os.path.exists(file_path):
-        print(f"{Style.BRIGHT}{Fore.RED}[XML Splitter]: {Style.NORMAL}File {file_path} not found.{Style.RESET_ALL}")
-        return
-    p_name = extract_patent_name(patent_id)
-    print(f"{Style.BRIGHT}{Fore.LIGHTMAGENTA_EX}[XML Splitter]: {Style.NORMAL}Parsed patent {patent_id} with name: {p_name}{Style.RESET_ALL}")
-    asignee_info = extract_assignee_info(patent_id)
-    print(f"{Style.BRIGHT}{Fore.LIGHTBLUE_EX}[XML Splitter]: {Style.RESET_ALL}Assignee info for patent {patent_id}: {asignee_info}")
-    # TODO: Remaining fields
-
-
-###############################################################################
 #                                   MAIN                                      #
 ###############################################################################
 
@@ -382,4 +188,4 @@ if __name__ == '__main__':
         sys.exit(1)
     
     split_xml_by_patent(FILE_NAME)
-    #parse_one("20240315157")
+    

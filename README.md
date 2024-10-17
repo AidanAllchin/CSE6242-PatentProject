@@ -47,3 +47,7 @@ python src/data_cleaning/xml_splitter.py
 ```
 
 It should split the data file into more manageable file sizes, each one corresponding to the ID of a patent in the larger data.
+
+2. Use `src/data_cleaning/patent_parsing.py` to create **Patent** objects for every Patent with sufficient information.
+
+3. WIP: Generate the SQLite database using the **Patent** objects with the `to_sqlite` function.
