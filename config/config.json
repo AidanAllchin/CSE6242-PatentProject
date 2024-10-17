@@ -1,6 +1,7 @@
 {
     "settings": {
         "desired_data_release": "2024-09-26",
-        "data_link": "https://bulkdata.uspto.gov/data/patent/application/redbook/fulltext/"
+        "data_link": "https://bulkdata.uspto.gov/data/patent/application/redbook/fulltext/",
+        "database_path": "data/patents.db"
     }
 }

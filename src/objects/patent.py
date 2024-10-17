@@ -18,6 +18,7 @@ from colorama import Fore, Style
 from typing import Dict
 from datetime import datetime
 import sqlite3
+import json
 
 class Patent:
     def __init__(self, patent_id: int, patent_name: str, assignee_info: list, inventor_info: list, dates_info: Dict, classifications: Dict, application_number: int, document_kind: str, application_type: str, abstract: str, claims: list, description: str):
@@ -160,7 +161,7 @@ class Patent:
             conn (sqlite3.Connection): The SQLite database connection.
         """
         query = """
-        INSERT INTO patents (
+        INSERT OR REPLACE INTO patents (
             patent_id, 
             patent_name, 
             assignee_info, 
@@ -178,15 +179,15 @@ class Patent:
         data = (
             self.patent_id, 
             self.patent_name, 
-            self.assignee_info, 
-            self.inventor_info, 
-            self.dates_info, 
-            self.classifications, 
+            json.dumps(self.assignee_info), 
+            json.dumps(self.inventor_info), 
+            json.dumps(self.dates_info), 
+            json.dumps(self.classifications), 
             self.application_number, 
             self.document_kind, 
             self.application_type, 
             self.abstract, 
-            self.claims, 
+            json.dumps(self.claims), 
             self.description
         )
         cursor = conn.cursor()
@@ -229,7 +230,20 @@ class Patent:
             Patent: The Patent object created from the database
         """
         patent_id, patent_name, assignee_info, inventor_info, dates_info, classifications, application_number, document_kind, application_type, abstract, claims, description = tupl
-        return cls(patent_id, patent_name, assignee_info, inventor_info, dates_info, classifications, application_number, document_kind, application_type, abstract, claims, description)
-
-
-
+        
+        # Deserialize the JSON strings
+        return cls(
+            patent_id=patent_id,
+            patent_name=patent_name,
+            assignee_info=json.loads(assignee_info),
+            inventor_info=json.loads(inventor_info),
+            dates_info=json.loads(dates_info),
+            classifications=json.loads(classifications),
+            application_number=application_number,
+            document_kind=document_kind,
+            application_type=application_type,
+            abstract=abstract,
+            claims=json.loads(claims),
+            description=description
+        )
+    

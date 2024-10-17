@@ -26,28 +26,22 @@ python -m venv venv
 source venv/bin/activate  # On Windows, use venv\Scripts\activate
 ```
 
-3. Run the initialization script:
+3. Install required packages:
 
 ```
-python __init__.py
+pip install -r requirements.txt
 ```
-
-This script will:
-
-- Install required packages from `requirements.txt`
-- Create necessary directories
-- Download the correct version of the dataset
 
 ## Usage
 
-1. Eventually `main.py` will hold all this junk but for now run the following to split the data into individual xml files:
+1. The script `python main.py` will walk through the steps to generate the SQLite database we'll be using for the remainder of the project. It's the only file that needs to be run manually after running `pip install -r requirements.txt`.
 
-```
-python src/data_cleaning/xml_splitter.py
-```
+This script will:
 
-It should split the data file into more manageable file sizes, each one corresponding to the ID of a patent in the larger data.
-
-2. Use `src/data_cleaning/patent_parsing.py` to create **Patent** objects for every Patent with sufficient information.
-
-3. WIP: Generate the SQLite database using the **Patent** objects with the `to_sqlite` function.
+- Create necessary directories
+- Download the correct version of the dataset
+- Split the large patent xml file into one file per patent
+- Remove invalid patent files
+- Parse relevant information and convert each patent to a **Patent** object
+- Add details including: tags, coordinates for assignee/inventor, etc.
+- Serialize all data into SQLite
