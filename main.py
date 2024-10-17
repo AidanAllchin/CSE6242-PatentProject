@@ -4,7 +4,7 @@
 Created: Tue Oct 17 2024
 Author: Aidan Allchin
 
-Ensure __init__.py has been run prior to running this script.
+Ensure `pip install -r requirements.txt` has been run prior to running this script.
 
 This script is the main entry point for cleaning the patent data. It reads the
 patent data from the `data/patents` directory, cleans the data by replacing/updating
