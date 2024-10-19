@@ -106,6 +106,12 @@ def add_coordinates(patents: List[Patent]) -> List[Patent]:
     for _, patent in enumerate(tqdm(patents, desc="Adding coordinates from cache")):
         for j, assignee in enumerate(patent.assignee_info):
             if assignee["city"] and assignee["country"]:
+                # Just to ensure I don't mess anything up with my pre-processing for the tsv,
+                # I'm replacing tabs with spaces here too
+                assignee["city"] = assignee["city"].replace("\t", " ")
+                assignee["country"] = assignee["country"].replace("\t", " ")
+                assignee["state"] = assignee["state"].replace("\t", " ") if assignee["state"] else None
+
                 if (assignee["city"], assignee["country"], assignee["state"] if assignee["state"] else "") in locations:
                     location = locations_df[(locations_df["city"] == assignee["city"]) & (locations_df["country"] == assignee["country"]) & (locations_df["state"] == assignee["state"] if assignee["state"] else "")]
                     patent.assignee_info[j]["latitude"]  = location["latitude"].values[0]
@@ -113,6 +119,9 @@ def add_coordinates(patents: List[Patent]) -> List[Patent]:
 
         for j, inventor in enumerate(patent.inventor_info):
             if inventor["city"] and inventor["country"]:
+                inventor["city"] = inventor["city"].replace("\t", " ")
+                inventor["country"] = inventor["country"].replace("\t", " ")
+                inventor["state"] = inventor["state"].replace("\t", " ") if inventor["state"] else None
                 if (inventor["city"], inventor["country"], inventor["state"] if inventor["state"] else "") in locations:
                     location = locations_df[(locations_df["city"] == inventor["city"]) & (locations_df["country"] == inventor["country"]) & (locations_df["state"] == inventor["state"] if inventor["state"] else "")]
                     patent.inventor_info[j]["latitude"]  = location["latitude"].values[0]
@@ -224,6 +233,11 @@ def clean_coordinate_info():
     # print out the failed entries
     # print(failed)
 
+    # Save the failed entries to a new file
+    failed_path = os.path.join(project_root, "data", "geolocation", "city_coordinates_failed.tsv")
+    failed.to_csv(failed_path, sep='\t', index=False)
+    log(f"Failed city coordinates saved to {local_filename(failed_path)}", color=Fore.YELLOW)
+
     # INput the correct values
     # for i, row in failed.iterrows():
     #     city = row["city"]
@@ -233,8 +247,8 @@ def clean_coordinate_info():
     #     if lat == "":
     #         continue
     #     lon = input(f"Enter longitude for {city}, {state}, {country}: ")
-    #     df.loc[i, "latitude"] = lat
-    #     df.loc[i, "longitude"] = lon
+    #     df.loc[i, "latitude"] = float(lat)
+    #     df.loc[i, "longitude"] = float(lon)
 
     # Save the cleaned data
     df.to_csv(tsv_path, sep='\t', index=False)
