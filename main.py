@@ -100,10 +100,10 @@ def check_data_availability():
     """Check if the required data is available and download if necessary."""
     data_name = config["settings"]["desired_data_release"]
     data_name = f"ipa{data_name[2:4]}{data_name[5:7]}{data_name[8:10]}"
-    data_path = os.path.join(PATENTS_DIRECTORY, "..", f"{data_name}.xml")
+    data_path = os.path.join(project_root, "data", f"{data_name}.xml")
 
     if not os.path.exists(data_path):
-        log(f"Data for {data_name[:4]} is not downloaded. Running __init__.py...", level="WARNING", color_full=True, color=Fore.RED)
+        log(f"Data {data_name} is not downloaded. Running __init__.py...", level="WARNING", color_full=True, color=Fore.RED)
         subprocess.run(["python3", "__init__.py"], check=True)
     
     if not os.path.exists(PATENTS_DIRECTORY) or not os.listdir(PATENTS_DIRECTORY):
