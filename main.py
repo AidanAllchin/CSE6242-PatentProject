@@ -69,13 +69,31 @@ def view_demo_patent():
     with sqlite3.connect(DATABASE_PATH) as conn:
         patent = Patent.from_sqlite_by_id(conn, 20240318365)
         print(patent)
+    print()
+
+def view_database_schema():
+    log("Database schema:", color=Fore.CYAN, color_full=True)
+    with sqlite3.connect(DATABASE_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        for table in tables:
+            cursor.execute(f"PRAGMA table_info({table[0]});")
+            columns = cursor.fetchall()
+            print('-' * 80)
+            log(f"{table[0]}:")
+            for column in columns:
+                log(f"  {column[1]} ({column[2]})", color=Fore.LIGHTBLUE_EX)
+
+    print('-' * 80 + '\n')
 
 def display_menu():
     """Display the main menu options."""
     print(f"{Style.BRIGHT}       Main Menu{Style.RESET_ALL}")
     print("1. Initialize database")
     print("2. View demo patent")
-    print("3. Exit\n")
+    print("3. View database schema")
+    print("4. Exit\n")
     return input("Select an option: ")
 
 def check_data_availability():
@@ -102,14 +120,17 @@ def main():
         option = display_menu()
         if option == "1":
             log(f"Note: This will erase the existing database at {local_filename(DATABASE_PATH)}...", level="WARNING")
-            user_input = input("Please ensure you have downloaded `city_coordinates.tsv` first. Continue? (y/n): ")
+            user_input = input(f"Please ensure you have downloaded {Style.DIM}`city_coordinates.tsv`{Style.NORMAL} first. Continue? (y/n): ")
             if user_input.lower() == "y":
                 init_database()
+            else: print()
         elif option == "2":
             if not os.path.exists(DATABASE_PATH) or os.path.getsize(DATABASE_PATH) == 0:
                 log("Database does not exist. Please initialize the database first.\n", level="ERROR")
             else: view_demo_patent()
         elif option == "3":
+            view_database_schema()
+        elif option == "4":
             break
         else:
             log("Invalid option. Please try again.", color=Fore.RED)

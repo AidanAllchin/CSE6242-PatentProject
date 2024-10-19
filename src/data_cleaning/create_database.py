@@ -58,7 +58,7 @@ patents = add_coordinates(patents)
 log("\nExample patent:", color=Fore.MAGENTA)
 print(patents[0])
 
-print('-' * 80 + '\n')
+print('\n' + '-' * 80)
 log("\nSetting up database...", color=Fore.MAGENTA, color_full=True)
 
 # Create a connection to the database
@@ -100,6 +100,6 @@ for patent in tqdm(patents, desc="Inserting patents"):
 # Close the connection
 conn.close()
 
-log(f"Inserted {len(patents)} patents into the database.", color=Fore.GREEN)
-log(f"Database is size {os.path.getsize(DATABASE_PATH) / 1024 / 1024:.2f} MB.")
+log(f"\nInserted {len(patents)} patents into the database.", color=Fore.GREEN)
+log(f"Database is size {os.path.getsize(DATABASE_PATH) / 1024 / 1024:.2f} MB.\n", color_full=True)
 

@@ -23,7 +23,7 @@ from tqdm import tqdm
 import json
 from lxml import etree
 from src.objects.patent import Patent
-from src.other.helpers import get_patent_id_from_filename, log
+from src.other.helpers import get_patent_id_from_filename, log, local_filename
 
 
 ###############################################################################
@@ -576,7 +576,7 @@ def collect_patent_objects() -> List[Patent]:
     patent_files = [f for f in patent_files if f.endswith('.xml')]
     #patent_ids   = [re.search(r'\d+', f).group() for f in patent_files]
 
-    log(f"Found {len(patent_files)} patent files in {PATENTS_DIRECTORY.replace(str(project_root), '..')}.\n", color=Fore.CYAN, color_full=True)
+    log(f"Found {len(patent_files)} patent files in {local_filename(PATENTS_DIRECTORY)}.\n", color=Fore.CYAN, color_full=True)
     
     # Parse a single patent file
     #print(parse_one(os.path.join(PATENTS_DIRECTORY, "patent_20240317807.xml")))#patent_files[2])))
