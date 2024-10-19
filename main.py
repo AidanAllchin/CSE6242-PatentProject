@@ -19,20 +19,29 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent
 sys.path.insert(0, str(project_root))
 
+import json
+import subprocess
+import sqlite3
+
+# Test all imports
 try:
     from colorama import Fore, Style
-    import json
-    import subprocess
-    import sqlite3
+    import pandas as pd
+    import numpy as np
+    import geopy
+    import lxml.etree as ET
+    from tqdm import tqdm
     from src.other.helpers import log, local_filename
     from src.objects.patent import Patent
 except ImportError as e:
     log(f"Error importing modules: {e}", color=Fore.RED)
     log(f"Ensure you have run `pip install -r requirements.txt` or manually run `python __init__.py", color=Fore.RED)
 
+
 ###############################################################################
 #                               CONFIGURATION                                 #
 ###############################################################################
+
 
 # Directories
 PATENTS_DIRECTORY = os.path.join(project_root, 'data', 'patents')
@@ -42,6 +51,12 @@ with open(CONFIG_PATH, 'r') as f:
 
 # Database
 DATABASE_PATH = os.path.join(project_root, config["settings"]["database_path"])
+
+
+###############################################################################
+#                              MAIN FUNCTIONS                                 #
+###############################################################################
+
 
 def init_database():
     """Initialize the database by creating tables and adding patent data."""
