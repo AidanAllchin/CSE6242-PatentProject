@@ -72,7 +72,7 @@ def view_demo_patent():
 
 def display_menu():
     """Display the main menu options."""
-    print("\nMain Menu:")
+    print(f"{Style.BRIGHT}       Main Menu{Style.RESET_ALL}")
     print("1. Initialize database")
     print("2. View demo patent")
     print("3. Exit\n")
@@ -85,7 +85,7 @@ def check_data_availability():
     data_path = os.path.join(PATENTS_DIRECTORY, "..", f"{data_name}.xml")
 
     if not os.path.exists(data_path):
-        log(f"Data for {data_name[:4]} is not downloaded. Running __init__.py...", color=Fore.YELLOW)
+        log(f"Data for {data_name[:4]} is not downloaded. Running __init__.py...", level="WARNING", color_full=True, color=Fore.RED)
         subprocess.run(["python3", "__init__.py"], check=True)
     
     if not os.path.exists(PATENTS_DIRECTORY) or not os.listdir(PATENTS_DIRECTORY):
@@ -94,6 +94,8 @@ def check_data_availability():
 
 def main():
     """Main function to run the patent processing pipeline."""
+    log("Starting patent processing pipeline...\n", color=Fore.CYAN, color_full=True)
+
     check_data_availability()
 
     while True:
@@ -104,9 +106,9 @@ def main():
             if user_input.lower() == "y":
                 init_database()
         elif option == "2":
-            if not os.path.exists(DATABASE_PATH):
-                log("Database does not exist. Please initialize the database first.", level="ERROR")
-            view_demo_patent()
+            if not os.path.exists(DATABASE_PATH) or os.path.getsize(DATABASE_PATH) == 0:
+                log("Database does not exist. Please initialize the database first.\n", level="ERROR")
+            else: view_demo_patent()
         elif option == "3":
             break
         else:

@@ -16,7 +16,7 @@ if not os.path.exists("requirements.txt"):
     print("Error: requirements.txt not found. Please confirm git repository is cloned correctly and you are in the correct directory.")
     sys.exit(1)
 
-confirm = input("\n\nThis script will install the required packages, create necessary directories, and download the data.\nPLEASE ENSURE YOU'RE USING YOUR DESIRED ENVIRONMENT...\nContinue? (y/n): ")
+confirm = input("\nThis script will install the required packages, create necessary directories, and download the data.\nPLEASE ENSURE YOU'RE USING YOUR DESIRED ENVIRONMENT...\nContinue? (y/n): ")
 if confirm.lower() != "y":
     print("Exiting...")
     sys.exit(0)
