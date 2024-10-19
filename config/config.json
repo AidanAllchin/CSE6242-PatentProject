@@ -2,6 +2,7 @@
     "settings": {
         "desired_data_release": "2024-09-26",
         "data_link": "https://bulkdata.uspto.gov/data/patent/application/redbook/fulltext/",
-        "database_path": "data/patents.db"
+        "database_path": "data/patents.db",
+        "city_coordinates_path": "data/geolocation/city_coordinates.tsv"
     }
 }

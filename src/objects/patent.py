@@ -68,7 +68,16 @@ class Patent:
             assert 'country' in assignee, "Assignee country missing"
             if assignee['country'] is not None:
                 assert len(assignee['country']) == 2, f"Assignee country must be a 2-letter abbreviation, not {assignee['country']}"
-            assert len(assignee) == 4, f"Assignee must have 4 fields, not {len(assignee)}"
+            
+            if not 'latitude' or not 'longitude' in assignee:
+                assignee['latitude'] = None
+                assignee['longitude'] = None
+
+            if assignee['latitude'] is not None:
+                assert isinstance(assignee['latitude'], float), f"Assignee latitude must be a float, not {type(assignee['latitude'])}"
+                assert isinstance(assignee['longitude'], float), f"Assignee longitude must be a float, not {type(assignee['longitude'])}"
+            
+            assert len(assignee) == 6, f"Assignee must have 6 fields, not {len(assignee)}"
 
         for inventor in self.inventor_info:
             assert isinstance(inventor, dict), f"Inventor must be a dictionary, not {type(inventor)}"
@@ -79,7 +88,16 @@ class Patent:
             assert 'country' in inventor, "Inventor country missing"
             if inventor['country'] is not None:
                 assert len(inventor['country']) == 2, f"Inventor country must be a 2-letter abbreviation, not {inventor['country']}"
-            assert len(inventor) == 5, f"Inventor must have 5 fields, not {len(inventor)}"
+
+            if not 'latitude' or not 'longitude' in inventor:
+                inventor['latitude'] = None
+                inventor['longitude'] = None
+
+            if inventor['latitude'] is not None:
+                assert isinstance(inventor['latitude'], float), f"Inventor latitude must be a float, not {type(inventor['latitude'])}"
+                assert isinstance(inventor['longitude'], float), f"Inventor longitude must be a float, not {type(inventor['longitude'])}"
+
+            assert len(inventor) == 7, f"Inventor must have 7 fields, not {len(inventor)}"
 
         for d_name, d_val in self.dates_info.items():
             assert isinstance(d_name, str), f"Date name must be a string, not {type(d_name)}"
@@ -125,10 +143,12 @@ class Patent:
         s += f"\n{Style.BRIGHT}Assignee Info:{Style.RESET_ALL}"
         for assignee in self.assignee_info:
             s += f"\n\t- {assignee['name']} ({assignee['country']}): {assignee['city']}, {assignee['state'] if assignee['state'] else 'N/A'}"
+            s += f" | Coordinates: {Style.DIM}{assignee['latitude']}, {assignee['longitude']}{Style.RESET_ALL}" if assignee['latitude'] else f" | Coordinates: {Style.DIM}N/A{Style.RESET_ALL}"
 
         s += f"\n\n{Style.BRIGHT}Inventor Info:{Style.RESET_ALL}"
         for inventor in self.inventor_info:
             s += f"\n\t- {inventor['first_name']} {inventor['last_name']} ({inventor['country']}): {inventor['city']}, {inventor['state'] if inventor['state'] else 'N/A'}"
+            s += f" | Coordinates: {Style.DIM}{inventor['latitude']}, {inventor['longitude']}{Style.RESET_ALL}" if inventor['latitude'] else f" | Coordinates: {Style.DIM}N/A{Style.RESET_ALL}"
 
         s += f"\n\n{Style.BRIGHT}Dates Info:{Style.RESET_ALL}"
         for d_name, d_val in self.dates_info.items():
@@ -152,6 +172,30 @@ class Patent:
         s += f"\t|\t{Style.BRIGHT}Has Description:{Style.RESET_ALL}{Fore.GREEN if self.description else Fore.RED} {self.description is not None}{Style.RESET_ALL}"
 
         return s
+
+    def add_assignee_location(self, assignee: dict, latitude: float, longitude: float):
+        """
+        Adds the latitude and longitude to an assignee dictionary in the assignee_info list.
+
+        Args:
+            assignee (dict): The assignee dictionary to add the location to.
+            latitude (float): The latitude of the assignee.
+            longitude (float): The longitude of the assignee.
+        """
+        self.assignee_info[self.assignee_info.index(assignee)]['latitude'] = latitude
+        self.assignee_info[self.assignee_info.index(assignee)]['longitude'] = longitude
+
+    def add_inventor_location(self, inventor: dict, latitude: float, longitude: float):
+        """
+        Adds the latitude and longitude to an inventor dictionary in the inventor_info list.
+
+        Args:
+            inventor (dict): The inventor dictionary to add the location to.
+            latitude (float): The latitude of the inventor.
+            longitude (float): The longitude of the inventor.
+        """
+        self.inventor_info[self.inventor_info.index(inventor)]['latitude'] = latitude
+        self.inventor_info[self.inventor_info.index(inventor)]['longitude'] = longitude
 
     def to_sqlite(self, conn: sqlite3.Connection) -> None:
         """
@@ -246,4 +290,4 @@ class Patent:
             claims=json.loads(claims),
             description=description
         )
-    
+

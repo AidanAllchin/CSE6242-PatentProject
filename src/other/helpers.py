@@ -17,6 +17,10 @@ sys.path.insert(0, str(project_root))
 from colorama import Fore, Style
 import re
 import inspect
+import time
+import random
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 
 def get_patent_id_from_filename(fname: str) -> str:
     """
@@ -66,5 +70,52 @@ def log(message: str, level: str = "INFO", color = Fore.LIGHTMAGENTA_EX, color_f
         print(f"{Style.BRIGHT}{log_color}[{caller_filename}] {level}: {Style.RESET_ALL}{message}")
     else:
         print(f"{Style.BRIGHT}{log_color}[{caller_filename}] {level}: {Style.NORMAL}{message}{Style.RESET_ALL}")
+
+def get_coordinates_for_city(city: str, country: str, state: str = None) -> tuple:
+    """
+    Get the latitude and longitude of a city with exponential backoff retry logic.
+
+    Args:
+        city (str): The name of the city.
+        country (str): The name of the country.
+        state (str): The name of the state. Defaults to None.
+
+    Returns:
+        tuple: The latitude and longitude of the city, or (0.0, 0.0) if not found after all retries.
+    """
+    geolocator = Nominatim(user_agent="patent_project_geocoder")
+    
+    # Crazy how QUEUE is just Q with 4 silent letters after it
+    query = f"{city}, "
+    if state:
+        query += f"{state}, "
+    query += country
+
+    max_retries = 10  # Maximum number of retries (I may just set this to 1000)
+    base_delay  = 1   # Base delay (s)
+    max_delay   = 60  # Maximum delay (s)
+
+    for attempt in range(max_retries):
+        try:
+            location = geolocator.geocode(query, timeout=10)
+            if location:
+                return (location.latitude, location.longitude)
+            else:
+                log(f"Could not find coordinates for {query}", level="WARNING")
+                return 0.0, 0.0
+        except (GeocoderTimedOut, GeocoderUnavailable) as e:
+            delay = min(max_delay, base_delay * (2 ** attempt) + random.uniform(0, 1)) # Exponential backoff with jitter (little wiggle to prevent identical requests)
+            log(f"Geocoding service error. Retrying in {delay:.2f} seconds... (Attempt {attempt + 1}/{max_retries})", level="WARNING")
+            log(f"Error details: {str(e)}", level="DEBUG")
+            time.sleep(delay)
+
+    log(f"Failed to geocode {query} after {max_retries} attempts. Returning default coordinates.", level="ERROR")
+    return 0.0, 0.0
+
+def local_filename(global_fname: str | Path) -> str:
+    """
+    Converts a global file name to a local file name relative to the project root.
+    """
+    return global_fname.replace(str(project_root), "")
 
 

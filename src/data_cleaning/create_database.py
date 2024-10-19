@@ -18,8 +18,10 @@ sys.path.insert(0, str(project_root))
 from colorama import Fore, Style
 import sqlite3
 from tqdm import tqdm
+import time
 from src.objects.patent import Patent
 from src.data_cleaning.patent_parsing import collect_patent_objects
+from src.data_cleaning.patent_cleanup import add_coordinates, create_city_coordinates_cache
 from src.other.helpers import log
 
 # Database path
@@ -39,7 +41,25 @@ if os.path.exists(DATABASE_PATH):
 # Collect patent objects
 patents = collect_patent_objects()
 
-log("Setting up database...", color=Fore.CYAN)
+# Add location of each assignee and inventor to the patent object
+failed = True
+while failed:
+    try:
+        create_city_coordinates_cache(patents)
+        failed = False
+    except Exception as e:
+        print(e)
+        log("Failed to create city coordinates cache. Retrying...", color=Fore.RED)
+        time.sleep(10)
+
+patents = add_coordinates(patents)
+
+# Print example patent
+log("\nExample patent:", color=Fore.MAGENTA)
+print(patents[0])
+
+print('-' * 80 + '\n')
+log("\nSetting up database...", color=Fore.MAGENTA, color_full=True)
 
 # Create a connection to the database
 conn = sqlite3.connect(DATABASE_PATH)
@@ -73,6 +93,7 @@ log("Database and table created successfully.", color=Fore.GREEN)
 conn = sqlite3.connect(DATABASE_PATH)
 
 # Insert patent objects into the database
+print()
 for patent in tqdm(patents, desc="Inserting patents"):
     patent.to_sqlite(conn)
 
@@ -81,3 +102,4 @@ conn.close()
 
 log(f"Inserted {len(patents)} patents into the database.", color=Fore.GREEN)
 log(f"Database is size {os.path.getsize(DATABASE_PATH) / 1024 / 1024:.2f} MB.")
+

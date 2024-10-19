@@ -576,7 +576,7 @@ def collect_patent_objects() -> List[Patent]:
     patent_files = [f for f in patent_files if f.endswith('.xml')]
     #patent_ids   = [re.search(r'\d+', f).group() for f in patent_files]
 
-    log(f"Found {len(patent_files)} patent files in {PATENTS_DIRECTORY}.\n", color=Fore.CYAN, color_full=True)
+    log(f"Found {len(patent_files)} patent files in {PATENTS_DIRECTORY.replace(str(project_root), '..')}.\n", color=Fore.CYAN, color_full=True)
     
     # Parse a single patent file
     #print(parse_one(os.path.join(PATENTS_DIRECTORY, "patent_20240317807.xml")))#patent_files[2])))
@@ -587,7 +587,7 @@ def collect_patent_objects() -> List[Patent]:
     st    = time.time()
     times = []
     patent_objects = []
-    for i in tqdm(patent_files):
+    for i in tqdm(patent_files, desc="Creating Patent Objects"):
         full_name = os.path.join(PATENTS_DIRECTORY, i)
         patent_objects.append(parse_one(full_name))
         times.append(time.time() - st)
@@ -598,7 +598,7 @@ def collect_patent_objects() -> List[Patent]:
         log(f"\nSkipped {skip_count} patents due to missing names.", level="WARNING")
     log(f"Generated {len(patent_files) - skip_count} patent files in {time.time() - start:.2f}s.", color=Fore.LIGHTBLUE_EX, color_full=True)
 
-    print(patent_objects[0])
+    # print(patent_objects[0])
 
     return [p for p in patent_objects if p is not None]
 

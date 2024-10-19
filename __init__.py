@@ -59,8 +59,11 @@ def ensure_directory_exists(dir: str):
 if not os.path.exists("data"):
     ensure_directory_exists("data")
     ensure_directory_exists("data/patents")
+    ensure_directory_exists("data/geolocation")
 elif not os.path.exists("data/patents"):
     ensure_directory_exists("data/patents")
+elif not os.path.exists("data/geolocation"):
+    ensure_directory_exists("data/geolocation")
 if not os.path.exists("config"):
     ensure_directory_exists("config")
 
@@ -70,7 +73,10 @@ if not os.path.exists(CONFIG_PATH):
     print(f"{Fore.YELLOW}[init]: {Style.NORMAL}Creating config file...{Style.RESET_ALL}")
     with open(CONFIG_PATH, "w") as f:
         json.dump({"settings": {
-        "desired_data_release": "2024-09-26" # We can modify this to get data from different releases
+        "desired_data_release": "2024-09-26", # We can modify this to get data from different releases
+        "data_link": "https://bulkdata.uspto.gov/data/patent/application/redbook/fulltext/",
+        "database_path": "data/patents.db",
+        "city_coordinates_path": "data/geolocation/city_coordinates.tsv"
     }}, f)
 
 with open(CONFIG_PATH, "r") as f:
