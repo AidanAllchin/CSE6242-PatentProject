@@ -19,4 +19,5 @@ import time
 from tqdm import tqdm
 from src.other.helpers import log
 
-
+# For access to data here, just do f"{DATA_FOLDER}/and then whatever file name you want"
+DATA_FOLDER = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'bea')
