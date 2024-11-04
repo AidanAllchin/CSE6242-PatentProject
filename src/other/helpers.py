@@ -18,6 +18,7 @@ from colorama import Fore, Style
 import re
 import inspect
 import time
+import requests
 import random
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
@@ -58,7 +59,7 @@ def log(message: str, level: str = "INFO", color = Fore.LIGHTMAGENTA_EX, color_f
     }
 
     # Correctly handle newlines
-    if message.startswith("\n"):
+    while message.startswith("\n"):
         message = message[1:]
         print()
 
@@ -119,3 +120,26 @@ def local_filename(global_fname: str | Path) -> str:
     return global_fname.replace(str(project_root), "")
 
 
+def check_internet_connection(url='http://www.google.com/', timeout=5, retries: int = 0):
+    """
+    Check if the internet connection is available.
+
+    Args:
+        url (str): The URL to check the connection.
+        timeout (int): The timeout for the request.
+        retries (int): [DEFAULT=0] # of attempts.
+
+    Returns:
+        bool: True if the internet connection is available, False otherwise.
+    """
+    try:
+        requests.get(url, timeout=timeout)
+        return True
+    except requests.ConnectionError:
+        return False
+    except requests.exceptions.ReadTimeout:
+        time.sleep(5)
+        if retries < 3:
+            return check_internet_connection(url, timeout, retries=retries+1)
+
+        return False

@@ -5,7 +5,8 @@ Created: Wed Oct 30 2024
 Author: Aidan Allchin
 
 This is a script version of the Jupyter notebook designed for automated data
-download, merging, and cleaning.
+download, merging, and cleaning. This is some ugly ass code, but she does the 
+job.
 """
 import os, sys
 from pathlib import Path
@@ -200,7 +201,22 @@ df = df.drop(columns=['wipo_field_sequence', 'wipo_field_id', 'wipo_kind'])
 df['patent_date'] = pd.to_datetime(df['patent_date'])
 df = df[df['patent_date'] >= '2001-01-01'].sort_values('patent_date')
 
+# Also (forgot this earlier) drop all patents not within the US
+# TODO: I'm assuming we're using inventor for predictors and not assignee. Revisit.
+df = df[df['inventor_country' != 'US']]
+
 print(f"{Style.BRIGHT}{Fore.MAGENTA}This leaves us with a total of {len(df)} patents with full information since January 1st, 2001.{Style.RESET_ALL}")
+
+def safe_format():
+    """
+        Iterate through the columns of `df` and 
+        .replace all '\t' in all string columns
+    """
+    for col in df.columns:
+        if isinstance(df[col].dtype, object):
+            df[col] = df[col].str.replace('\t', ' ')
+
+safe_format()
 
 dest_path = os.path.join(os.getcwd(), 'data', 'processed_patents.tsv')
 df.to_csv(dest_path, sep='\t', index=False)

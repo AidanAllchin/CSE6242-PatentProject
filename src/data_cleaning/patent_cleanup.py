@@ -37,148 +37,108 @@ from src.other.helpers import log, get_coordinates_for_city, local_filename
 with open(os.path.join(project_root, "config", "config.json"), "r") as f:
     config = json.load(f)
 
+LOCATIONS_TSV_PATH = os.path.join(project_root, config["settings"]["city_coordinates_path"])
+
 
 ###############################################################################
-#                           CLEAN PATENT DATA                                 #
+#                              Coordinate Stuff                               #
 ###############################################################################
 
 
-# def add_assignee_location(patent: Patent) -> Patent:
-#     """
-#     Add the latitude and longitude of the assignee location to the patent object.
-    
-#     Args:
-#         patent: Patent object
-
-#     Returns:
-#         Patent object with latitude and longitude added
-#     """
-#     for i, assignee in enumerate(patent.assignee_info):
-#         if assignee["city"] and assignee["country"]:
-#             lat, lon = get_coordinates_for_city(assignee["city"], assignee["country"], assignee["state"] if assignee["state"] else None)
-#             patent.assignee_info[i]["latitude"]  = lat
-#             patent.assignee_info[i]["longitude"] = lon
-
-#     return patent
-
-# def add_inventor_location(patent: Patent) -> Patent:
-#     """
-#     Add the latitude and longitude of the inventor location to the patent object.
-    
-#     Args:
-#         patent: Patent object
-
-#     Returns:
-#         Patent object with latitude and longitude added
-#     """
-#     for i, inventor in enumerate(patent.inventor_info):
-#         if inventor["city"] and inventor["country"]:
-#             lat, lon = get_coordinates_for_city(inventor["city"], inventor["country"], inventor["state"] if inventor["state"] else None)
-#             patent.inventor_info[i]["latitude"]  = lat
-#             patent.inventor_info[i]["longitude"] = lon
-
-#     return patent
-
-def add_coordinates(patents: List[Patent]) -> List[Patent]:
+def add_coordinates(patents: pd.DataFrame) -> pd.DataFrame:
     """
     For every patent in the list, add the latitude and longitude of the assignee
     and inventor locations.
     
     Args:
-        patents: List of Patent objects
+        patents (pd.DataFrame): The pandas DataFrame with the patents straight after the merging.
         
     Returns:
-        List of Patent objects with latitude and longitude added
+        pd.DataFrame: The same patents DataFrame with latitude and longitude 
+            information for the primary inventor and primary assignee.
     """
-    locations_tsv_path = os.path.join(project_root, config["settings"]["city_coordinates_path"])
 
     # Ensure the city coordinates file exists
-    if not os.path.exists(locations_tsv_path):
-        log(f"City coordinates file not found at {local_filename(locations_tsv_path)}.", level="ERROR")
+    if not os.path.exists(LOCATIONS_TSV_PATH):
+        log(f"City coordinates file not found at {local_filename(LOCATIONS_TSV_PATH)}.", level="ERROR")
         return patents
 
     # Read the city coordinates file
-    locations_df = pd.read_csv(locations_tsv_path, sep='\t')
+    locations_df = pd.read_csv(LOCATIONS_TSV_PATH, sep='\t')
     locations = set(locations_df.apply(lambda row: (row['city'], row['country'], row['state']), axis=1))
 
     # Add coordinates to each patent
     print()
-    for _, patent in enumerate(tqdm(patents, desc="Adding coordinates from cache")):
-        for j, assignee in enumerate(patent.assignee_info):
-            if assignee["city"] and assignee["country"]:
-                # Just to ensure I don't mess anything up with my pre-processing for the tsv,
-                # I'm replacing tabs with spaces here too
-                assignee["city"] = assignee["city"].replace("\t", " ")
-                assignee["country"] = assignee["country"].replace("\t", " ")
-                assignee["state"] = assignee["state"].replace("\t", " ") if assignee["state"] else None
+    for i, patent in tqdm(patents.iterrows(), desc="Adding coordinates from cache"):
+        if (patent["inventor_city"].lower(), patent["inventor_country"].lower(), patent["inventor_state"].lower() if patent["inventor_state"] else "") in locations:
+            location = locations_df[(locations_df["inventor_city"] == patent["inventor_city"].lower()) & (locations_df["inventor_country"] == patent["inventor_country"].lower()) & (locations_df["inventor_state"] == patent["inventor_state"].lower() if patent["inventor_state"] else "")]
+            patents[i, "inventor_latitude"]  = location["latitude"].values[0]
+            patents[i, "inventor_longitude"] = location["longitude"].values[0]
+        else:
+            patents[i, "inventor_latitude"]  = 0.0
+            patents[i, "inventor_longitude"] = 0.0
 
-                if (assignee["city"], assignee["country"], assignee["state"] if assignee["state"] else "") in locations:
-                    location = locations_df[(locations_df["city"] == assignee["city"]) & (locations_df["country"] == assignee["country"]) & (locations_df["state"] == assignee["state"] if assignee["state"] else "")]
-                    patent.assignee_info[j]["latitude"]  = location["latitude"].values[0]
-                    patent.assignee_info[j]["longitude"] = location["longitude"].values[0]
+        if (patent["assignee_city"].lower(), patent["assignee_country"].lower(), patent["assignee_state"].lower() if patent["assignee_state"] else "") in locations:
+            location = locations_df[(locations_df["assignee_city"] == patent["assignee_city"].lower()) & (locations_df["assignee_country"] == patent["assignee_country"].lower()) & (locations_df["assignee_state"] == patent["assignee_state"].lower() if patent["assignee_state"] else "")]
+            patents[i, "assignee_latitude"]  = location["latitude"].values[0]
+            patents[i, "assignee_longitude"] = location["longitude"].values[0]
+        else:
+            patents[i, "assignee_latitude"]  = 0.0
+            patents[i, "assignee_longitude"] = 0.0
 
-        for j, inventor in enumerate(patent.inventor_info):
-            if inventor["city"] and inventor["country"]:
-                inventor["city"] = inventor["city"].replace("\t", " ")
-                inventor["country"] = inventor["country"].replace("\t", " ")
-                inventor["state"] = inventor["state"].replace("\t", " ") if inventor["state"] else None
-                if (inventor["city"], inventor["country"], inventor["state"] if inventor["state"] else "") in locations:
-                    location = locations_df[(locations_df["city"] == inventor["city"]) & (locations_df["country"] == inventor["country"]) & (locations_df["state"] == inventor["state"] if inventor["state"] else "")]
-                    patent.inventor_info[j]["latitude"]  = location["latitude"].values[0]
-                    patent.inventor_info[j]["longitude"] = location["longitude"].values[0]
+    num_without_coordinates = len(patents[patents['assignee_latitude' == 0.0] | patents['assignee_longitude'] == 0
+                                        | patents['inventor_latitude' == 0.0] | patents['inventor_longitude'] == 0])
     
+    t = "WARNING" if num_without_coordinates > 0 else "INFO"
+    log(f"After adding coordinates, there are {num_without_coordinates} rows without parsed locations.", level=t)
+
     return patents
 
-
-# Temporary function for creating the cache of city coordinates (stored in a CSV file)
-# This should not be run by team members, but will be shared with the team
-# after completion.
-def create_city_coordinates_cache(patents: List[Patent]) -> None:
+# Function for creating the cache of city coordinates (stored in a CSV file)
+# This should not be run by team members, but the result will be shared with the team
+# after completion. Not directly part of the pipeline.
+def create_city_coordinates_cache(patents: pd.DataFrame) -> None:
     """
     Create a cache of city coordinates by iterating over all patents and
     collecting the latitude and longitude of each city.
 
     Args:
-        patents: List of Patent objects
+        patents (pd.DataFrame): The pandas DataFrame containing all the patents
     """
-    tsv_path = os.path.join(project_root, "data", "geolocation", "city_coordinates.tsv")
-    
     # Ensure coords dir exists
-    os.makedirs(os.path.dirname(tsv_path), exist_ok=True)
+    os.makedirs(os.path.dirname(LOCATIONS_TSV_PATH), exist_ok=True)
+
+    # Initial parsing (faster than iterating)
+    patents['inventor_city']    = patents['inventor_city'].lower()
+    patents['inventor_state']   = patents['inventor_state'].lower()
+    patents['inventor_country'] = patents['inventor_country'].lower()
+
+    patents['assignee_city']    = patents['assignee_city'].lower()
+    patents['assignee_state']   = patents['assignee_state'].lower()
+    patents['assignee_country'] = patents['assignee_country'].lower()
 
     # Create a set of all unique cities
     cities = set()
     no_city_counter = 0
     print()
-    for patent in tqdm(patents, desc="Collecting cities"):
-        for assignee in patent.assignee_info:
-            if assignee["state"]:
-                assignee["state"] = assignee["state"].replace("\t", " ")
-            if assignee["country"]:
-                assignee["country"] = assignee["country"].replace("\t", " ")
-            if assignee["city"]:
-                assignee["city"] = assignee["city"].replace("\t", " ")
-                cities.add((assignee["city"], assignee["country"], assignee["state"] if assignee["state"] else ""))
-            else:
-                no_city_counter += 1
-        for inventor in patent.inventor_info:
-            if inventor["state"]:
-                inventor["state"] = inventor["state"].replace("\t", " ")
-            if inventor["country"]:
-                inventor["country"] = inventor["country"].replace("\t", " ")
-            if inventor["city"]:
-                inventor["city"] = inventor["city"].replace("\t", " ")
-                cities.add((inventor["city"], inventor["country"], inventor["state"] if inventor["state"] else ""))
-            else:
-                no_city_counter += 1
+    for i, patent in tqdm(patents.iterrows(), desc="Collecting unique locations"):
+        if patent['inventor_city'] is not None:
+            cities.add((patent["inventor_city"], patent["inventor_country"], patent["inventor_state"] if patent["inventor_state"] else ""))
+        else:
+            no_city_counter += 1
+        if patent["assignee_city"] is not None:
+            cities.add((patent["assignee_city"], patent["assignee_country"], patent["assignee_state"] if patent["assignee_state"] else ""))
+        else:
+            no_city_counter += 1
 
     log(f"Found {len(cities)} unique cities.", color=Fore.CYAN)
     log(f"Unfortunately, {no_city_counter} entries exist with no city, meaning no coordinates will be added.", level="WARNING")
     
     # Read existing entries
     existing_cities = set()
-    if os.path.exists(tsv_path):
-        df = pd.read_csv(tsv_path, sep='\t', header=0, keep_default_na=False)
+    if os.path.exists(LOCATIONS_TSV_PATH):
+        df = pd.read_csv(LOCATIONS_TSV_PATH, sep='\t', header=0, keep_default_na=False)
+
         # Gotta make this messy because dataframes won't format tuples correctly
         existing_cities = set(df.apply(lambda row: (row['city'], row['country'], row['state']), axis=1))
 
@@ -187,8 +147,8 @@ def create_city_coordinates_cache(patents: List[Patent]) -> None:
 
     # Create or update the cache of city coordinates
     failed_counter = 0
-    mode = 'a' if os.path.exists(tsv_path) else 'w'
-    with open(tsv_path, mode, newline='', encoding='utf-8') as f:
+    mode = 'a' if os.path.exists(LOCATIONS_TSV_PATH) else 'w' # Don't want to overwrite if she already exists
+    with open(LOCATIONS_TSV_PATH, mode, newline='', encoding='utf-8') as f:
         if mode == 'w':
             f.write("city\tcountry\tstate\tlatitude\tlongitude\n")
         
@@ -204,7 +164,7 @@ def create_city_coordinates_cache(patents: List[Patent]) -> None:
 
     if failed_counter > 0:
         log(f"Failed to find coordinates for {failed_counter} cities.", level="WARNING")
-    log(f"City coordinates cache created/updated at {local_filename(tsv_path)}", color=Fore.GREEN)
+    log(f"City coordinates cache created/updated at {local_filename(LOCATIONS_TSV_PATH)}", color=Fore.GREEN)
 
     clean_coordinate_info()
 
@@ -213,16 +173,14 @@ def clean_coordinate_info():
     Clean the coordinate tsv file. This should only be called after the cache
     has been created in the `create_city_coordinates_cache` function.
     """
-    tsv_path = os.path.join(project_root, config["settings"]["city_coordinates_path"])
-    
     # Ensure coords dir exists
-    os.makedirs(os.path.dirname(tsv_path), exist_ok=True)
-    if not os.path.exists(tsv_path):
-        log(f"City coordinates file not found at {local_filename(tsv_path)}.", level="ERROR")
+    os.makedirs(os.path.dirname(LOCATIONS_TSV_PATH), exist_ok=True)
+    if not os.path.exists(LOCATIONS_TSV_PATH):
+        log(f"City coordinates file not found at {local_filename(LOCATIONS_TSV_PATH)}.", level="ERROR")
         return
 
     # Read existing entries
-    df = pd.read_csv(tsv_path, sep='\t')
+    df = pd.read_csv(LOCATIONS_TSV_PATH, sep='\t')
     length_prior = len(df)
     df = df.drop_duplicates()
     log(f"Removed {length_prior - len(df)} duplicate entries.", color=Fore.CYAN)
@@ -251,5 +209,19 @@ def clean_coordinate_info():
     #     df.loc[i, "longitude"] = float(lon)
 
     # Save the cleaned data
-    df.to_csv(tsv_path, sep='\t', index=False)
-    log(f"Cleaned city coordinates saved to {local_filename(tsv_path)}", color=Fore.GREEN)
+    df.to_csv(LOCATIONS_TSV_PATH, sep='\t', index=False)
+    log(f"Cleaned city coordinates saved to {local_filename(LOCATIONS_TSV_PATH)}", color=Fore.GREEN)
+
+
+###############################################################################
+#                               Mapping to FIPS                               #
+###############################################################################
+
+
+# Each US county has it's own unique FIPS code. After adding a latitude and 
+# longitude for each patent we can use those to determine which county the 
+# patent originated from, and can add the FIPS code (uid for US county) to each
+# patent, which we will later group on.
+
+def add_fips_codes(patents: pd.DataFrame) -> pd.DataFrame:
+    pass # This one is gonna be tough

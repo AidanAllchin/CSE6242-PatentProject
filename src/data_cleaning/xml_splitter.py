@@ -13,7 +13,7 @@ the `data/patents` directory. The patent applications are identified by the
 This is specifically designed for the USPTO patent XML file located at:
 https://developer.uspto.gov/product/patent-application-full-text-dataxml
 
-THIS PROCESS IS DEPRECATED. USE `import_data.py` INSTEAD.
+NOTE: THIS IS DEPRECATED. USE `import_data.py` INSTEAD.
 """
 import os, sys
 from pathlib import Path

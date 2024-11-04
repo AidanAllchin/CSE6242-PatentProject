@@ -5,7 +5,9 @@ Created: Tue Oct 17 2024
 Author: Aidan Allchin
 
 This script is used to create a SQLite database and insert patent data into it.
-Can be run individually but will be called explicitly by `main.py`.
+Can be run individually but will (no longer be called) by `main.py`.
+
+NOTE: DEPRECATED. OUR NEW IMPLEMENTATION DOES NOT MAKE USE OF SQLITE.
 """
 import os, sys
 from pathlib import Path

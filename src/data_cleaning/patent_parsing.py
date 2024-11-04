@@ -6,6 +6,8 @@ Author: Aidan Allchin
 
 This script is used to parse the individual patent XML files to create Patent
 objects. 
+
+NOTE: THIS IS NOW DEPRECATED. USE `import_data.py` INSTEAD.
 """
 import os, sys
 from pathlib import Path
@@ -38,7 +40,7 @@ with open(CONFIG_PATH, 'r') as f:
     config = json.load(f)
 
 skip_count = 0
-
+sys.exit(1)
 
 ###############################################################################
 #                             INDIVIDUAL PARSER                               #

@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 """
-Created: Tue Oct 17 2024
+Created: Mon Nov 04 2024
 Author: Aidan Allchin
 
 Ensure `pip install -r requirements.txt` has been run prior to running this script.
 
-This script is the main entry point for cleaning the patent data. It reads the
-patent data from the `data/patents` directory, cleans the data by replacing/updating
-fields with patent-specific terminology to be more readable and consistent, and
-saves the cleaned data to the SQLite database located at `data/patents.db`.
+This script is the main entry point for cleaning the patent data. It downloads
+the required tables from the USPTO site, merges the appropriate tables,
+adds coordinates to each of the patents, and then sorts them by county.
+Provides a (gross looking, sure) menu to navigate the creation of predictive
+factors for our Innovation Hub Predictor Model.
 """
 import os, sys
 from pathlib import Path
@@ -21,16 +22,14 @@ sys.path.insert(0, str(project_root))
 
 import json
 import subprocess
-import sqlite3
 
 # Test all imports
 try:
     from colorama import Fore, Style
-    import pandas as pd
-    import numpy as np
-    import geopy
-    import lxml.etree as ET
-    from tqdm import tqdm
+    import pandas as pd  # Note: Not used here but we want to make sure it works
+    import numpy as np   # Note: Not used here but we want to make sure it works
+    import geopy         # Note: Not used here but we want to make sure it works
+    from tqdm import tqdm# Note: Not used here but we want to make sure it works
     from src.other.helpers import log, local_filename
     from src.objects.patent import Patent
 except ImportError as e:
@@ -44,13 +43,13 @@ except ImportError as e:
 
 
 # Directories
-PATENTS_DIRECTORY = os.path.join(project_root, 'data', 'patents')
+PATENTS_DIRECTORY    = os.path.join(project_root, 'data', 'patents')
+CLEANED_PATENTS_PATH = os.path.join(project_root, 'data', 'processed_patents.tsv')
+BEA_DATA_PATH        = os.path.join(project_root, 'data', 'bea', 'bea_predictors.tsv')
+CENSUS_DATA_PATH     = os.path.join(project_root, 'data', 'census', 'census_predictors.tsv')
 CONFIG_PATH = os.path.join(project_root, 'config', 'config.json')
 with open(CONFIG_PATH, 'r') as f:
     config = json.load(f)
-
-# Database
-DATABASE_PATH = os.path.join(project_root, config["settings"]["database_path"])
 
 
 ###############################################################################
@@ -58,79 +57,94 @@ DATABASE_PATH = os.path.join(project_root, config["settings"]["database_path"])
 ###############################################################################
 
 
-def init_database():
-    """Initialize the database by creating tables and adding patent data."""
-    log("Adding patent data to the database...", color=Fore.CYAN)
-    subprocess.run(["python3", "src/data_cleaning/create_database.py"], check=True)
+def get_patent_data():
+    """
+    This script should handle all patent data download and merging. The end 
+    result is `<root>/data/processed_patents.tsv`.
+    """
+    try:
+        subprocess.run(["python3", "src/data_cleaning/patent_data.py"], check=True)
+        print()
+    except subprocess.CalledProcessError as e:
+        print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `patent_data.py`: {e}{Style.RESET_ALL}\n")
 
-def view_demo_patent():
-    """Display a demo patent from the database."""
-    log("Displaying demo patent...", color=Fore.CYAN)
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        patent = Patent.from_sqlite_by_id(conn, 20240318365)
-        print(patent)
-    print()
+def get_bea_data():
+    """
+    Downloads and creates a .tsv with the Bureau of Economic Analysis data
+    organized by county and grouped by time period.
 
-def view_database_schema():
-    log("Database schema:", color=Fore.CYAN, color_full=True)
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        for table in tables:
-            cursor.execute(f"PRAGMA table_info({table[0]});")
-            columns = cursor.fetchall()
-            print('-' * 80)
-            log(f"{table[0]}:")
-            for column in columns:
-                log(f"  {column[1]} ({column[2]})", color=Fore.LIGHTBLUE_EX)
+    Should result in a `<root>/data/bea/bea_predictors.tsv` file.
+    """
+    try:
+        # TODO: Waiting for Kaitlyn to finish
+        subprocess.run(["python3", "src/modeling_overlays/bea_data.py"], check=True)
+        print()
+    except subprocess.CalledProcessError as e:
+        print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `bea_data.py`: {e}{Style.RESET_ALL}\n")
 
-    print('-' * 80 + '\n')
+def get_census_data():
+    """
+    Downloads and creates a .tsv with the US Census data
+    organized by county and grouped by time period.
+
+    Should result in a `<root>/data/census/census_predictors.tsv` file.
+    """
+    try:
+        # TODO: Waiting for Kaitlyn to finish
+        subprocess.run(["python3", "src/modeling_overlays/census_data.py"], check=True)
+        print()
+    except subprocess.CalledProcessError as e:
+        print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `census_data.py`: {e}{Style.RESET_ALL}\n")
+
+def create_model_predictors():
+    """
+    Uses patent data, BEA data, Fed data, Census data to create predictor
+    variables for each county in the US, for each time period. Also generates
+    an `innovation_score` for each region/time to use as a response variable.
+
+    Should result in a `<root>/data/model.tsv` file.
+    """
+    pass
 
 def display_menu():
     """Display the main menu options."""
     print(f"{Style.BRIGHT}       Main Menu{Style.RESET_ALL}")
-    print("1. Initialize database")
-    print("2. View demo patent")
-    print("3. View database schema")
-    print("4. Exit\n")
+    print("1. ETL patent data")
+    print("2. ETL BEA data")
+    print("3. ETL census data")
+    print("4. Generate Innovation Hub Predictor Model (IHPM) variables")
+    print("0. Exit\n")
     return input("Select an option: ")
-
-def check_data_availability():
-    """Check if the required data is available and download if necessary."""
-    data_name = config["settings"]["desired_data_release"]
-    data_name = f"ipa{data_name[2:4]}{data_name[5:7]}{data_name[8:10]}"
-    data_path = os.path.join(project_root, "data", f"{data_name}.xml")
-
-    if not os.path.exists(data_path):
-        log(f"Data {data_name} is not downloaded. Running __init__.py...", level="WARNING", color_full=True, color=Fore.RED)
-        subprocess.run(["python3", "__init__.py"], check=True)
-    
-    if not os.path.exists(PATENTS_DIRECTORY) or not os.listdir(PATENTS_DIRECTORY):
-        log("Data directory is empty. Running xml_splitter.py...", color=Fore.YELLOW)
-        subprocess.run(["python3", "src/data_cleaning/xml_splitter.py"], check=True)
 
 def main():
     """Main function to run the patent processing pipeline."""
     log("Starting patent processing pipeline...\n", color=Fore.CYAN, color_full=True)
 
-    check_data_availability()
-
     while True:
         option = display_menu()
         if option == "1":
-            log(f"Note: This will erase the existing database at {local_filename(DATABASE_PATH)}...", level="WARNING")
-            user_input = input(f"Please ensure you have downloaded {Style.DIM}`city_coordinates.tsv`{Style.NORMAL} first. Continue? (y/n): ")
+            user_input = input(f"Please ensure you have downloaded {Style.DIM}`city_coordinates.tsv`{Style.NORMAL} first and are using the correct python environment. Continue? (y/n): ")
             if user_input.lower() == "y":
-                init_database()
+                get_patent_data()
             else: print()
         elif option == "2":
-            if not os.path.exists(DATABASE_PATH) or os.path.getsize(DATABASE_PATH) == 0:
-                log("Database does not exist. Please initialize the database first.\n", level="ERROR")
-            else: view_demo_patent()
+            get_bea_data()
         elif option == "3":
-            view_database_schema()
+            get_census_data()
         elif option == "4":
+            if not os.path.exists(CLEANED_PATENTS_PATH) or os.path.getsize(CLEANED_PATENTS_PATH) == 0:
+                log("\nCleaned patents file doesn't exists. Please run step 1 first.\n", level="ERROR")
+                continue
+            if not os.path.exists(BEA_DATA_PATH) or os.path.getsize(BEA_DATA_PATH) == 0:
+                log("\nBEA predictors file doesn't exists. Please run step 2 first.\n", level="ERROR")
+                continue
+            if not os.path.exists(CENSUS_DATA_PATH) or os.path.getsize(CENSUS_DATA_PATH) == 0:
+                log("\nCensus predictors file doesn't exists. Please run step 3 first.\n", level="ERROR")
+                continue
+
+            # If everything we need exists, run that shit
+            create_model_predictors()
+        elif option == "0":
             break
         else:
             log("Invalid option. Please try again.", color=Fore.RED)
