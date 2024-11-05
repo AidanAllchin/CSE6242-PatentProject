@@ -6,6 +6,8 @@ GitHub repo for our project.
 
 ### Data Used
 
+Note that **manual downloading of these files is not required**. Multiple files require specific file locations and naming conventions, so `__init__.py` (and by extension, `main.py`) will download, rename, and move these files automatically to ensure consistency.
+
 |  Source   |           Table Name           |                                            Link                                             |
 | :-------: | :----------------------------: | :------------------------------------------------------------------------------------------ |
 | **USPTO** |           `g_patent`           |           https://s3.amazonaws.com/data.patentsview.org/download/g_patent.tsv.zip           |
