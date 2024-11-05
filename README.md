@@ -32,9 +32,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-**FOR THE MOMENT, THE CORRECT USAGE TO DOWNLOAD AND CLEAN THE DATA IS TO MANUALLY RUN THE PYTHON NOTEBOOK.** This will change once I modify `main.py` to use the new data cleaning steps that Reid laid out. Ignore the following.
-
-1. The script `python main.py` will walk through the steps to generate the SQLite database we'll be using for the remainder of the project. It's the only file that needs to be run manually after running `pip install -r requirements.txt`.
+1. The script `python main.py` will walk through the steps to generate the `.tsv` files we'll be using for the remainder of the project. It's the only file that needs to be run. The menu items are designed to be run sequentially.
 
 This script will:
 

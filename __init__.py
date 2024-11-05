@@ -13,7 +13,7 @@ import os, sys, subprocess, json, re, time
 from src.other.helpers import check_internet_connection
 
 if not check_internet_connection():
-    print(f"--- THIS SCRIPT REQUIRES AN INTERNET CONNECTION TO FUNCTION ---")
+    print(f"--- INIT.PY REQUIRES AN INTERNET CONNECTION TO FUNCTION. SKIPPING ---")
     sys.exit(0)
 
 # Install the required packages

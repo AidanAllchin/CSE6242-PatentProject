@@ -72,6 +72,25 @@ def log(message: str, level: str = "INFO", color = Fore.LIGHTMAGENTA_EX, color_f
     else:
         print(f"{Style.BRIGHT}{log_color}[{caller_filename}] {level}: {Style.NORMAL}{message}{Style.RESET_ALL}")
 
+def completion_time(s_runtime: int) -> str:
+    """
+    Returns a string with just the hour, minute, and second values from 
+    time.ctime().
+
+    Args:
+        s_runtime (int): Number of seconds between now and task completion.
+
+    Returns:
+        str: "HH:MM:SS (SSs)" of completion
+    """
+    s = time.ctime(time.time() + s_runtime)
+    s = s.split(':')
+    hh = s[0][-2:]
+    mm = s[1].replace(':', '')
+    ss = s[2][:2]
+    
+    return hh + ":" + mm + ":" + ss + f" ({s_runtime}s)"
+
 def get_coordinates_for_city(city: str, country: str, state: str = None) -> tuple:
     """
     Get the latitude and longitude of a city with exponential backoff retry logic.
@@ -107,7 +126,7 @@ def get_coordinates_for_city(city: str, country: str, state: str = None) -> tupl
         except (GeocoderTimedOut, GeocoderUnavailable) as e:
             delay = min(max_delay, base_delay * (2 ** attempt) + random.uniform(0, 1)) # Exponential backoff with jitter (little wiggle to prevent identical requests)
             log(f"Geocoding service error. Retrying in {delay:.2f} seconds... (Attempt {attempt + 1}/{max_retries})", level="WARNING")
-            log(f"Error details: {str(e)}", level="DEBUG")
+            #log(f"Error details: {str(e)}", level="DEBUG")
             time.sleep(delay)
 
     log(f"Failed to geocode {query} after {max_retries} attempts. Returning default coordinates.", level="ERROR")

@@ -16,7 +16,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-import import_data # Should do what it does
+import subprocess; subprocess.run(['python3', 'src/data_cleaning/import_data.py']) # This is hacky - fix eventually
 import pandas as pd
 from src.other.helpers import log, local_filename, check_internet_connection
 from src.data_cleaning.patent_cleanup import add_coordinates, add_fips_codes
