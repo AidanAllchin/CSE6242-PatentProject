@@ -277,7 +277,7 @@ def comma_separate_fields():
     """
     global df
     combining_st = time.time()
-    df['wipo_field_title'] = df.groupby('patent_id')['wipo_field_title'].transform(lambda x: '[%s]' % ', '.join(f'"{val}"' for val in x))
+    df['wipo_field_title'] = df.groupby('patent_id')['wipo_field_title'].transform(lambda x: str(list(x)))
     df = df.drop_duplicates(subset='patent_id')
     print(f"  > Combined all {Style.DIM}wipo_field_title{Style.NORMAL} values for each patent into a single cell in {time.time() - combining_st:.2f}s.")
 
