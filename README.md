@@ -7,7 +7,7 @@ GitHub repo for our project.
 ### Data Used
 
 |  Source   |           Table Name           |                                            Link                                             |
-| :-------: | :----------------------------: | :-----------------------------------------------------------------------------------------: |
+| :-------: | :----------------------------: | :------------------------------------------------------------------------------------------ |
 | **USPTO** |           `g_patent`           |           https://s3.amazonaws.com/data.patentsview.org/download/g_patent.tsv.zip           |
 | **USPTO** | `g_inventor_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_inventor_not_disambiguated.tsv.zip |
 | **USPTO** | `g_location_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_location_not_disambiguated.tsv.zip |
