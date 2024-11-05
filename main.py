@@ -33,6 +33,7 @@ try:
     from src.other.helpers import log, local_filename
     from src.objects.patent import Patent
 except ImportError as e:
+    subprocess.run(["python3", "__init__.py"], check=True)
     log(f"Error importing modules: {e}", color=Fore.RED)
     log(f"Ensure you have run `pip install -r requirements.txt` or manually run `python __init__.py", color=Fore.RED)
 

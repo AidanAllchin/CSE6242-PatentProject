@@ -243,7 +243,7 @@ print(f"\n  > {Style.BRIGHT}Current length of the dataframe (# of unique patents
 
 # Start timer
 wipo_merge_start = time.time()
-log(f"\nMerging WIPO data with patent data. Estimated completion time: {completion_time(17)}", color=Fore.LIGHTCYAN_EX)
+log(f"\nMerging WIPO data with patent data. Estimated completion time: {completion_time(12)}", color=Fore.LIGHTCYAN_EX)
 
 # Merge to get WIPO type for each patent (~10s)
 df = pd.merge(df_no_wipo, wipo_g, on='patent_id', how='left')
