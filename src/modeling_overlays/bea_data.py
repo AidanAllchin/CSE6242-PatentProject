@@ -20,4 +20,10 @@ from tqdm import tqdm
 from src.other.helpers import log
 
 # For access to data here, just do f"{DATA_FOLDER}/and then whatever file name you want"
-DATA_FOLDER = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'bea')
+DATA_FOLDER = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
+
+# Paths
+employment_p = os.path.join(DATA_FOLDER, 'raw', 'yearly_employment_county.csv')
+gdp_p        = os.path.join(DATA_FOLDER, 'raw', 'yearly_gdp_county.csv')
+income_p     = os.path.join(DATA_FOLDER, 'raw', 'yearly_personal_income_county.csv')
+more_info_p  = os.path.join(DATA_FOLDER, 'raw', 'yearly_more_county_info.csv')

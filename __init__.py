@@ -84,7 +84,8 @@ if not os.path.exists("data/raw"):
 if not os.path.exists("config"):
     ensure_directory_exists("config")
 
-CONFIG_PATH = "config/config.json"
+CONFIG_PATH   = "config/config.json"
+RAW_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "raw")
 
 if not os.path.exists(CONFIG_PATH):
     print(f"{Fore.YELLOW}[__init__.py]: {Style.NORMAL}Creating config file...{Style.RESET_ALL}")
@@ -189,20 +190,20 @@ def download_old():
 
 # download_old()
 
-def download_raw_tables():
+def fetch_patent_raw_data():
     # Downloads the raw tables from USPTO required to run the notebook Reid made
     # Paths (modified to be local)
-    patents_g_p   = os.path.join(os.path.dirname(__file__), 'data', 'raw', 'g_patent.tsv')
-    applicant_g_p = os.path.join(os.path.dirname(__file__), 'data', 'raw', 'g_inventor_not_disambiguated.tsv')
-    location_g_p  = os.path.join(os.path.dirname(__file__), 'data', 'raw', 'g_location_not_disambiguated.tsv')
-    assignee_g_p  = os.path.join(os.path.dirname(__file__), 'data', 'raw', 'g_assignee_not_disambiguated.tsv')
-    wipo_g_p      = os.path.join(os.path.dirname(__file__), 'data', 'raw', 'g_wipo_technology.tsv')
+    patents_g_p   = os.path.join(RAW_DATA_PATH, 'g_patent.tsv')
+    applicant_g_p = os.path.join(RAW_DATA_PATH, 'g_inventor_not_disambiguated.tsv')
+    location_g_p  = os.path.join(RAW_DATA_PATH, 'g_location_not_disambiguated.tsv')
+    assignee_g_p  = os.path.join(RAW_DATA_PATH, 'g_assignee_not_disambiguated.tsv')
+    wipo_g_p      = os.path.join(RAW_DATA_PATH, 'g_wipo_technology.tsv')
 
     def zip_instead(p: str) -> str:
         return p + ".zip"
 
     # Download the raw tables
-    print(f"\n{Style.BRIGHT}{Fore.CYAN}--- DOWNLOADING RAW TABLES ---{Style.RESET_ALL}")
+    print(f"\n{Style.BRIGHT}{Fore.CYAN}--- DOWNLOADING RAW USPTO TABLES ---{Style.RESET_ALL}")
     if not os.path.exists(patents_g_p):
         print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}g_patent.tsv{Style.NORMAL}...{Style.RESET_ALL}")
         os_specific_download("https://s3.amazonaws.com/data.patentsview.org/download/g_patent.tsv.zip", zip_instead(patents_g_p))
@@ -255,6 +256,88 @@ def download_raw_tables():
 
     print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}All raw tables downloaded.{Style.RESET_ALL}")
 
+def fetch_bea_raw_tables():
+    # Downloads the raw tables from BEA needed to create predictors
+    # Paths (modified to be local)
+    yearly_income_p      = os.path.join(RAW_DATA_PATH, 'yearly_personal_income_county.csv')
+    yearly_income_b      = os.path.join(RAW_DATA_PATH, 'CAINC1__ALL_AREAS_1969_2022.csv')
+    yearly_gdp_p         = os.path.join(RAW_DATA_PATH, 'yearly_gdp_county.csv')
+    yearly_gdp_b         = os.path.join(RAW_DATA_PATH, 'CAGDP1__ALL_AREAS_2001_2022.csv')
+    yearly_employment_p  = os.path.join(RAW_DATA_PATH, 'yearly_employment_county.csv')
+    yearly_employment_b  = os.path.join(RAW_DATA_PATH, 'CAINC4__ALL_AREAS_1969_2022.csv')
+    yearly_more_county_p = os.path.join(RAW_DATA_PATH, 'yearly_more_county_info.csv')
+    yearly_more_county_b = os.path.join(RAW_DATA_PATH, 'CAINC30__ALL_AREAS_1969_2022.csv')
 
-download_raw_tables()
+    def zip_instead(p: str) -> str:
+        return p + ".zip"
+    
+    # Download the raw tables
+    print(f"\n{Style.BRIGHT}{Fore.CYAN}--- DOWNLOADING RAW BEA TABLES ---{Style.RESET_ALL}")
+    ran = False
+
+    if not os.path.exists(yearly_income_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}yearly_personal_income_county.zip{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_download("https://apps.bea.gov/regional/zip/CAINC1.zip", zip_instead(yearly_income_p))
+
+        # unzip
+        print(f"{Fore.LIGHTMAGENTA_EX}[__init__.py]: Unzipping {Style.DIM}yearly_personal_income_county.zip{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_unzip(zip_instead(yearly_income_p), os.path.dirname(yearly_income_b))
+
+        # Rename
+        os.rename(yearly_income_b, yearly_income_p)
+        ran = True
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.DIM}yearly_personal_income_county.zip{Style.NORMAL} already exists.{Style.RESET_ALL}")
+
+    if not os.path.exists(yearly_gdp_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}yearly_gdp_county.zip{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_download("https://apps.bea.gov/regional/zip/CAGDP1.zip", zip_instead(yearly_gdp_p))
+
+        # unzip
+        print(f"{Fore.LIGHTMAGENTA_EX}[__init__.py]: Unzipping {Style.DIM}yearly_gdp_county.zip{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_unzip(zip_instead(yearly_gdp_p), os.path.dirname(yearly_gdp_b))
+
+        # Rename
+        os.rename(yearly_gdp_b, yearly_gdp_p)
+        ran = True
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.DIM}yearly_gdp_county.zip{Style.NORMAL} already exists.{Style.RESET_ALL}")
+
+    if not os.path.exists(yearly_employment_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}yearly_employment_county.zip{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_download("https://apps.bea.gov/regional/zip/CAINC4.zip", zip_instead(yearly_employment_p))
+
+        # unzip
+        print(f"{Fore.LIGHTMAGENTA_EX}[__init__.py]: Unzipping {Style.DIM}yearly_employment_county.zip{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_unzip(zip_instead(yearly_employment_p), os.path.dirname(yearly_employment_b))
+
+        # Rename
+        os.rename(yearly_employment_b, yearly_employment_p)
+        ran = True
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.DIM}yearly_employment_county.zip{Style.NORMAL} already exists.{Style.RESET_ALL}")
+
+    if not os.path.exists(yearly_more_county_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}yearly_more_county_info.zip{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_download("https://apps.bea.gov/regional/zip/CAINC30.zip", zip_instead(yearly_more_county_p))
+
+        # unzip
+        print(f"{Fore.LIGHTMAGENTA_EX}[__init__.py]: Unzipping {Style.DIM}yearly_more_county_info.zip{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_unzip(zip_instead(yearly_more_county_p), os.path.dirname(yearly_more_county_b))
+
+        # Rename
+        os.rename(yearly_more_county_b, yearly_more_county_p)
+        ran = True
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.DIM}yearly_more_county_info.zip{Style.NORMAL} already exists.{Style.RESET_ALL}")
+
+    if ran:
+        # Remove all files in the folder that start with CAINC1
+        for f in os.listdir(RAW_DATA_PATH):
+            if f.startswith('CAINC1') or f.startswith('CAGDP1') or f.startswith('CAINC4') or f.startswith('CAINC30'):
+                os.remove(os.path.join(RAW_DATA_PATH, f))
+
+fetch_patent_raw_data()
+fetch_bea_raw_tables()
+
 print(f"{Style.BRIGHT}{Fore.GREEN}[__init__.py]:{Style.NORMAL} Initialization complete.{Style.RESET_ALL}")
