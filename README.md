@@ -13,7 +13,6 @@ GitHub repo for our project.
 | **USPTO** | `g_location_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_location_not_disambiguated.tsv.zip |
 | **USPTO** | `g_assignee_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_assignee_not_disambiguated.tsv.zip |
 | **USPTO** |      `g_wipo_technology`       |      https://s3.amazonaws.com/data.patentsview.org/download/g_wipo_technology.tsv.zip       |
-|  :----:   |              :--:              |                                            :--:                                             |
 |  **BEA**  | `CAINC1__ALL_AREAS_1969_2022`  |                        https://apps.bea.gov/regional/zip/CAINC1.zip                         |
 |  **BEA**  | `CAGDP1__ALL_AREAS_2001_2022`  |                        https://apps.bea.gov/regional/zip/CAGDP1.zip                         |
 |  **BEA**  | `CAINC4__ALL_AREAS_1969_2022`  |                        https://apps.bea.gov/regional/zip/CAINC4.zip                         |
