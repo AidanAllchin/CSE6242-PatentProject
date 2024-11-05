@@ -20,6 +20,7 @@ from typing import List, Tuple, Set
 import pandas as pd
 import json
 import time
+import requests
 from tqdm import tqdm
 from src.objects.patent import Patent
 from src.other.helpers import log, get_coordinates_for_city, local_filename, completion_time
@@ -39,6 +40,7 @@ with open(os.path.join(project_root, "config", "config.json"), "r") as f:
     config = json.load(f)
 
 LOCATIONS_TSV_PATH = os.path.join(project_root, config["settings"]["city_coordinates_path"])
+USPTO_API_KEY      = config["uspto_key"]
 
 
 ###############################################################################
@@ -115,6 +117,63 @@ def add_coordinates(patents: pd.DataFrame) -> pd.DataFrame:
     log(f"After adding coordinates, there are {num_without_coordinates} rows without parsed locations.", level=t)
 
     return patents
+
+def api_request_coordinates(location_id: str) -> Tuple[float, float, str]:
+    """
+    Request location coordinates from USPTO PatentsView API
+    NOTE: Currently not working due to poor API documentation - waiting for email back from USPTO
+    
+    Args:
+        location_id: Location ID to look up
+        api_key: USPTO API key required for authentication
+        
+    Returns:
+        Tuple of (latitude, longitude, county_fips)
+    """
+    base_url = "https://search.patentsview.org/api/v1/location/"
+    
+    # Add the location ID directly to URL for GET request
+    url = f"{base_url}{location_id}/"
+
+    params = {
+        'q': json.dumps({"location_id": location_id}),
+        'f': json.dumps([
+            "location_latitude",
+            "location_longitude",
+            "location_county_fips",
+            "location_id"
+        ])
+    }
+    
+    headers = {
+        "X-Api-Key": USPTO_API_KEY
+    }
+    
+    response = requests.get(url, headers=headers, params=params)
+    
+    if response.status_code == 429:
+        log("API limit reached. Waiting 1 minute...", level="WARNING")
+        time.sleep(61)
+        return api_request_coordinates(location_id)
+    
+    elif response.status_code != 200:
+        print(f"Error: {response.status_code}")
+        print(response.text)
+        return 0.0, 0.0, ""
+    
+    data = response.json()
+    
+    # Extract location data from response
+    try:
+        location = data['locations'][0]
+        return (
+            location.get('location_latitude', 0.0),
+            location.get('location_longitude', 0.0),
+            location.get('location_county_fips', '')
+        )
+    except (KeyError, IndexError, TypeError):
+        print("Could not find location data in response")
+        return 0.0, 0.0, ""
 
 # Function for creating the cache of city coordinates (stored in a CSV file)
 # This should not be run by team members, but the result will be shared with the team
@@ -254,3 +313,5 @@ def add_fips_codes(patents: pd.DataFrame) -> pd.DataFrame:
 
 
 #add_coordinates(pd.read_csv(os.path.join(project_root, 'data/processed_patents.tsv'), sep='\t'))
+#print(api_request_coordinates('000005mtrirpdyrtlkfbffj0e'))
+#print(api_request_coordinates('439af3dd-16c8-11ed-9b5f-1234bde3cd05'))

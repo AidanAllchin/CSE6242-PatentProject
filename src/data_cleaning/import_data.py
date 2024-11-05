@@ -34,7 +34,7 @@ warnings.filterwarnings("ignore")
 
 dest_path = os.path.join(os.getcwd(), 'data', 'processed_patents.tsv')
 if os.path.exists(dest_path):
-    i = input(f"Looks like this has already been run: {local_filename(dest_path)} already exists. Overwrite? (y/n): ")
+    i = input(f"Looks like this has already been run: {Style.DIM}{local_filename(dest_path)}{Style.NORMAL} already exists. Overwrite? (y/n): ")
     if i.lower() != 'y':
         log("Aborting the initial cleaning steps.", level="WARNING")
         sys.exit()
@@ -170,9 +170,10 @@ assignee_g = assignee_g.rename(columns={
     'raw_city': 'assignee_city', 
     'raw_state': 'assignee_state', 
     'raw_country': 'assignee_country', 
-    'raw_assignee_organization': 'assignee'
+    'raw_assignee_organization': 'assignee',
+    'location_id': 'assignee_location_id'
 })
-assignee_g.drop(columns=['rawlocation_id', 'location_id'], inplace=True)
+assignee_g.drop(columns=['rawlocation_id'], inplace=True)
 
 print(f"  > Assignee data merged with location data in {time.time() - assignee_merge_start:.2f} seconds.")
 
@@ -197,9 +198,10 @@ applicant_g = applicant_g.rename(columns={
     'raw_state': 'inventor_state', 
     'raw_country': 'inventor_country',
     'raw_inventor_name_first': 'inventor_firstname',
-    'raw_inventor_name_last': 'inventor_lastname'
+    'raw_inventor_name_last': 'inventor_lastname',
+    'location_id': 'inventor_location_id'
 })
-applicant_g.drop(columns=['rawlocation_id', 'location_id'], inplace=True)
+applicant_g.drop(columns=['rawlocation_id'], inplace=True)
 
 print(f"  > Applicant data merged with location data in {time.time() - applicant_merge_start:.2f} seconds.")
 
@@ -275,7 +277,7 @@ def comma_separate_fields():
     """
     global df
     combining_st = time.time()
-    df['wipo_field_title'] = df.groupby('patent_id')['wipo_field_title'].transform(lambda x: ', '.join(x))
+    df['wipo_field_title'] = df.groupby('patent_id')['wipo_field_title'].transform(lambda x: '[%s]' % ', '.join(f'"{val}"' for val in x))
     df = df.drop_duplicates(subset='patent_id')
     print(f"  > Combined all {Style.DIM}wipo_field_title{Style.NORMAL} values for each patent into a single cell in {time.time() - combining_st:.2f}s.")
 
