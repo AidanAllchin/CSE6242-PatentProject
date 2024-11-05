@@ -108,8 +108,8 @@ def add_coordinates(patents: pd.DataFrame) -> pd.DataFrame:
             patents.loc[i, "assignee_latitude"]  = 0.0
             patents.loc[i, "assignee_longitude"] = 0.0
 
-    num_without_coordinates = len(patents[patents['assignee_latitude' == 0.0] | patents['assignee_longitude'] == 0
-                                        | patents['inventor_latitude' == 0.0] | patents['inventor_longitude'] == 0])
+    num_without_coordinates = len(patents[(patents['assignee_latitude'] == 0.0) | (patents['assignee_longitude'] == 0.0)
+                                        | (patents['inventor_latitude'] == 0.0) | (patents['inventor_longitude'] == 0.0)])
     
     t = "WARNING" if num_without_coordinates > 0 else "INFO"
     log(f"After adding coordinates, there are {num_without_coordinates} rows without parsed locations.", level=t)

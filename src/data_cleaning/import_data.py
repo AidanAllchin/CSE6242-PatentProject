@@ -251,13 +251,39 @@ df = pd.merge(df_no_wipo, wipo_g, on='patent_id', how='left')
 # Drop the few remaining columns we don't need
 df = df.drop(columns=['wipo_field_sequence', 'wipo_field_id', 'wipo_kind'])
 
-# Sort by date, and drop all before 2001-01-01
+# Sort by date and drop all before 2001-01-01
 df['patent_date'] = pd.to_datetime(df['patent_date'])
 df = df[df['patent_date'] >= '2001-01-01'].sort_values('patent_date')
 
 # Also (forgot this earlier) drop all patents not within the US
 # TODO: I'm assuming we're using inventor for predictors and not assignee. Revisit.
 df = df[df['inventor_country'] == 'US']
+#print(df['inventor_country'].value_counts())
+duplicates = df[df.duplicated(subset='patent_id', keep=False)]
+print(f"  > Number of duplicated patent_ids: {Style.DIM}{len(duplicates)}{Style.RESET_ALL}")
+
+#print(f"\n{Style.BRIGHT}Some of the duplicated patent_ids:{Style.RESET_ALL}")
+#print(duplicates.head(10))
+print(f"  > Number of unique patent_ids: {Style.DIM}{len(df['patent_id'].unique())}{Style.RESET_ALL}")
+print(f"  > Number of null {Style.DIM}wipo_field_title{Style.NORMAL} values: {Style.DIM}{df['wipo_field_title'].isna().sum()}{Style.RESET_ALL}. Dropping...")
+df = df.dropna(subset=['wipo_field_title'])
+
+def comma_separate_fields():
+    """
+    Instead of having multiple rows for every `wipo_field_title` value, these
+    should be comma separated in a single cell in list form.
+    """
+    global df
+    combining_st = time.time()
+    df['wipo_field_title'] = df.groupby('patent_id')['wipo_field_title'].transform(lambda x: ', '.join(x))
+    df = df.drop_duplicates(subset='patent_id')
+    print(f"  > Combined all {Style.DIM}wipo_field_title{Style.NORMAL} values for each patent into a single cell in {time.time() - combining_st:.2f}s.")
+
+log(f"\nMerging separate WIPO field titles for each patent. Estimated completion time: {completion_time(70)}", color=Fore.LIGHTCYAN_EX)
+comma_separate_fields()
+
+print(f"  > Number of unique assignee organizations: {Style.DIM}{len(df['assignee'].unique())}{Style.RESET_ALL}")
+print(f"  > Number of non-US assignee countries: {Style.DIM}{len(df[df['assignee_country'] != 'US'])}{Style.RESET_ALL}")
 
 print(f"  > WIPO data merged with patent data in {time.time() - wipo_merge_start:.2f} seconds.")
 
@@ -265,8 +291,8 @@ print(f"\n\n{Style.BRIGHT}{Fore.MAGENTA}This leaves us with a total of {len(df)}
 
 def safe_format():
     """
-        Iterate through the columns of `df` and 
-        .replace all '\t' in all string columns
+    Iterate through the columns of `df` and 
+    .replace all '\t' in all string columns
     """
     for col in df.columns:
         if isinstance(df[col].dtype, object):
