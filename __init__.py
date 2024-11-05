@@ -104,7 +104,7 @@ def os_specific_download(url: str, dest: str):
 
     if check_internet_connection():
         if sys_type == "linux":
-            subprocess.run(["wget", url])
+            subprocess.run(["wget", url, "-O", dest])
         elif sys_type == "win32":
             subprocess.run(["curl", url, "-o", dest])
         # mac doesn't have wget
