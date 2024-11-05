@@ -36,10 +36,16 @@ pip install -r requirements.txt
 
 This script will:
 
+- Install required packages if needed
 - Create necessary directories
-- Download the correct version of the dataset
-- Split the large patent xml file into one file per patent
-- Remove invalid patent files
-- Parse relevant information and convert each patent to a **Patent** object
-- Add details including: tags, coordinates for assignee/inventor, etc.
-- Serialize all data into SQLite
+- Download all required tables
+- Merge all tables
+- Perform all data cleaning steps
+- Generate a `processed_patents.tsv` file with all US-based patents since 2001 (this time constraint may no longer be necessary)
+- WIP: Add county information to every patent
+- WIP: Group patents and create model metrics organized by time window and county
+- WIP: Load census data
+- WIP: Load BEA data
+- WIP: Load Fed data
+- WIP: Create predictors and `innovation_score` for the Innovation Hub Predictor
+- WIP: Use generated model to predict next period innovation score for any county
