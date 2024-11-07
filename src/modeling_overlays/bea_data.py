@@ -4,7 +4,7 @@
 Created: Tue Oct 29 2024
 Author: Kaitlyn Williams
 
-Adds BEA data organized by MSA region and date to the /data directory as a tsv.
+Adds BEA data organized by county FIPS code and year to the /data directory as a tsv.
 """
 import os, sys
 from pathlib import Path

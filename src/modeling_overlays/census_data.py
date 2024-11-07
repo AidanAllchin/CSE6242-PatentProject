@@ -4,7 +4,8 @@
 Created: Tue Oct 29 2024
 Author: Kaitlyn Williams
 
-Gathers relevant census data for the patent data, and organizes it by MSA region and date.
+Gathers relevant census data for each county we have patent data in, and 
+organizes it by county FIPS code and year to the /data directory as a tsv.
 """
 import os, sys
 from pathlib import Path
@@ -20,4 +21,7 @@ from tqdm import tqdm
 from src.other.helpers import log
 
 # For access to data here, just do f"{DATA_FOLDER}/and then whatever file name you want"
-DATA_FOLDER = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'census')
+DATA_FOLDER  = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'census')
+NAME_TO_FIPS = os.path.join(DATA_FOLDER, 'fips_to_county.tsv')
+
+
