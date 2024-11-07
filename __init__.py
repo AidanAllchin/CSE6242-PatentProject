@@ -340,6 +340,8 @@ def fetch_bea_raw_tables():
 def fetch_helper_tables():
     fips_converter_p = os.path.join(RAW_DATA_PATH, '..', 'census', 'fips_to_county.tsv')
 
+    print(f"\n{Style.BRIGHT}{Fore.CYAN}--- DOWNLOADING HELPER TABLES ---{Style.RESET_ALL}")
+
     if not os.path.exists(fips_converter_p):
         print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}fips_to_county.tsv{Style.NORMAL}...{Style.RESET_ALL}")
         os_specific_download("https://raw.githubusercontent.com/ChuckConnell/articles/refs/heads/master/fips2county.tsv", fips_converter_p)
