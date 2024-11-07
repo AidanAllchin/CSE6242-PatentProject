@@ -337,7 +337,19 @@ def fetch_bea_raw_tables():
             if f.startswith('CAINC1') or f.startswith('CAGDP1') or f.startswith('CAINC4') or f.startswith('CAINC30'):
                 os.remove(os.path.join(RAW_DATA_PATH, f))
 
+def fetch_helper_tables():
+    fips_converter_p = os.path.join(RAW_DATA_PATH, '..', 'census', 'fips_to_county.tsv')
+
+    if not os.path.exists(fips_converter_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}fips_to_county.tsv{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_download("https://raw.githubusercontent.com/ChuckConnell/articles/refs/heads/master/fips2county.tsv", fips_converter_p)
+
+    print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}All helper tables downloaded.{Style.RESET_ALL}")
+
+
+
 fetch_patent_raw_data()
 fetch_bea_raw_tables()
+fetch_helper_tables()
 
 print(f"{Style.BRIGHT}{Fore.GREEN}[__init__.py]:{Style.NORMAL} Initialization complete.{Style.RESET_ALL}")
