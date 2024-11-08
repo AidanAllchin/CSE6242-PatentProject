@@ -95,6 +95,18 @@ def add_coordinates():
     # Update patents file and city_coordinates.tsv
     final_merge_and_clean()
 
+    # Drop all remaining patents with locations of 0.0 for latitude and longitude
+    # in either the inventor or assignee locations
+    patents = pd.read_csv(FINAL_PATENTS_PATH, sep='\t')
+    num_patents = len(patents)
+    patents = patents[(patents['inventor_latitude'] != 0.0) & (patents['inventor_longitude'] != 0.0)]
+    patents = patents[(patents['assignee_latitude'] != 0.0) & (patents['assignee_longitude'] != 0.0)]
+    num_remaining = len(patents)
+    num_removed = num_patents - num_remaining
+    patents.to_csv(FINAL_PATENTS_PATH, sep='\t', index=False)
+    log(f"Removed {num_removed} patents with 0.0 for latitude and longitude in either inventor or assignee locations.", color=Fore.CYAN)
+    log(f"Lost {num_removed / num_patents * 100:.2f}% of patents due to missing coordinates.", color_full=True)
+
 def api_request_coordinates(location_id: str) -> Tuple[float, float, str]:
     """
     Request location coordinates from USPTO PatentsView API
