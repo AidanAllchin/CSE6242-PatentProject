@@ -87,13 +87,21 @@ class ProcessingMetrics:
                 - est_remaining: Estimated time remaining
         """
         elapsed = (datetime.now() - self.start_time).total_seconds()
+        
         est_remaining = (elapsed/self.completed_locations * (self.total_locations-self.completed_locations)) if self.completed_locations else 0
         if est_remaining > 3600:
             est_remaining = f"{est_remaining/3600:.1f}h"
         elif est_remaining > 60:
             est_remaining = f"{est_remaining/60:.1f}m"
+
+        if elapsed > 3600:
+            elapsed = f"{elapsed/3600:.1f}h"
+        elif elapsed > 60:
+            elapsed = f"{elapsed/60:.1f}m"
+        else:
+            elapsed = f"{elapsed:.1f}s"
         return {
-            'runtime': f"{elapsed:.1f}s",
+            'runtime': elapsed,
             'avg_batch_time': f"{sum(self.batch_times)/len(self.batch_times):.2f}s" if self.batch_times else "N/A",
             'avg_location_time': f"{sum(self.location_times)/len(self.location_times):.2f}s" if self.location_times else "N/A",
             'completion': f"{self.completed_locations}/{self.total_locations} ({(self.completed_locations/self.total_locations*100):.1f}%)" if self.total_locations else "0/0 (0%)",
@@ -200,11 +208,6 @@ class LocationCleaner:
             }
             for bad, new in self.corrections.items()
         ])
-
-        # Remove rows where the new values are the same as the old
-        # df = df[df[['bad_city', 'bad_state', 'bad_country']] != df[['new_city', 'new_state', 'new_country']].values]
-
-        # if not df.empty:
         df.to_csv(self.output_tsv, sep='\t', index=False)
         log(f"Saved {len(self.corrections)} corrections to {local_filename(self.output_tsv)}.", color=Fore.LIGHTGREEN_EX)
 
@@ -231,6 +234,7 @@ class LocationCleaner:
     - Return exact input if any uncertainty exists
     - If one of the values is unknown, return the original value even if the other values have been corrected (i.e. ['seatttle', 'wa', 'unknown'] -> ['Seattle', 'WA', 'unknown'])
     - Focus on low character-change corrections. For example, changing "ato, nj" to "Atco, NJ" is better than "Atlantic City, NJ"
+    - The order in the 'corrected' field must be city, state, country, even if the input is in a different order
     - DO NOT CORRECT LOCATIONS TO THE MOST POPULAR CITY/STATE/COUNTRY. ONLY CORRECT BASED ON POTENTIAL TYPOGRAPHICAL ERRORS, MISPELLINGS, OR OTHER OBVIOUS MISTAKES.
 
     You must respond with a JSON array where each object has exactly two keys:
@@ -255,6 +259,7 @@ class LocationCleaner:
         prompt = f"""Please analyze and correct these {len(locations)} location entries.
 For each location, provide spelling corrections and proper capitalization.
 Only make corrections when absolutely certain, otherwise return the original values.
+Be sure to put the state and country in the correct order.
 
 Input locations (as [city, state, country]):
 {locations_str}
@@ -270,6 +275,10 @@ Example response format:
         {{
             "original": ["sãn josé", "ca", "us"],
             "corrected": ["San Jose", "CA", "US"]
+        }},
+        {{
+            "original": ["seatttlle", "us", "wa"],
+            "corrected": ["Seattle", "WA", "US"]
         }}
     ]
 }}
@@ -411,7 +420,7 @@ Example response format:
         failed_locations = df[
             (df['latitude'] == 0.0) & 
             (df['longitude'] == 0.0)
-        ][['city', 'country', 'state']].drop_duplicates().values.tolist()
+        ][['city', 'state', 'country']].drop_duplicates().values.tolist()
         
         locations_to_process = [
             tuple(loc) for loc in failed_locations 
@@ -448,7 +457,7 @@ Example response format:
                 if self.metrics:
                     self.metrics.print_progress()
             
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.05)
         
         # Final stats and save
         if self.metrics:
