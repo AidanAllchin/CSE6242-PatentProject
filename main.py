@@ -38,7 +38,7 @@ from src.data_cleaning.patent_cleanup import add_coordinates, add_fips_codes
 
 # Directories
 PATENTS_DIRECTORY    = os.path.join(project_root, 'data', 'patents')
-CLEANED_PATENTS_PATH = os.path.join(project_root, 'data', 'processed_patents.tsv')
+CLEANED_PATENTS_PATH = os.path.join(project_root, 'data', 'patents.tsv')
 BEA_DATA_PATH        = os.path.join(project_root, 'data', 'bea', 'bea_predictors.tsv')
 CENSUS_DATA_PATH     = os.path.join(project_root, 'data', 'census', 'census_predictors.tsv')
 CONFIG_PATH = os.path.join(project_root, 'config', 'config.json')
