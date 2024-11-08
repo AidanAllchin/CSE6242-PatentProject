@@ -472,7 +472,7 @@ def final_merge_and_clean(batch_size: int = 10000):
         chunk.to_csv(INTERIM_PATENTS_PATH, sep='\t', index=False, mode='a', header=not os.path.exists(INTERIM_PATENTS_PATH))
 
     #######################################################################
-    #        Step 4: Add coordinates to patents using lowercase lookup     #
+    #       Step 4: Add coordinates to patents using lowercase lookup     #
     #######################################################################
     log(f"Adding coordinates from master file. Estimated completion time: {completion_time(140)}.", color=Fore.LIGHTCYAN_EX)
     coord_add_start = time.time()

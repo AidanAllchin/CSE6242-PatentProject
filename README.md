@@ -63,8 +63,9 @@ This script will:
 - Download all required tables
 - Merge all tables
 - Perform all data cleaning steps
-- Generate a `processed_patents.tsv` file with all US-based patents since 2001 (this time constraint may no longer be necessary)
-- WIP: Add county information to every patent
+- Add latitude and longitude for inventor and assignee to each patent
+- WIP: Add inventor origination county information to every patent based on coordinates
+- Generate a `patents.tsv` file with all US-based patents since 2001 (this time constraint may no longer be necessary)
 - WIP: Group patents and create model metrics organized by time window and county
 - WIP: Load census data
 - WIP: Load BEA data
