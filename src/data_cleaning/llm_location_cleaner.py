@@ -10,8 +10,8 @@ to misspellings, typos, etc. and saves a best guess for the correct state,
 city, and country. The mapping between original state, city, and country and
 the corrected state, city, and country is saved to a TSV file.
 
-NOTE: DO NOT RUN THIS WITHOUT A POWERFUL MACHINE. Will light your CPU on fire
-and take up an extra 8GB of storage.
+NOTE: DO NOT RUN THIS WITHOUT A POWERFUL MACHINE. Will light your processor on 
+fire and take up an extra 20GB of storage.
 
 I also realize this is an insane way of trying to fix this, but if the USPTO 
 API continues to not work, this is my best idea.
@@ -36,9 +36,9 @@ from typing import List, Dict, Tuple, Optional
 from src.other.helpers import log, local_filename
 
 # Constants
-BATCH_SIZE      = 2     # may need to lower this if accuracy is dogs**t
-PREFERRED_MODEL = "llama3.2-vision:11b"
-SAVE_INTERVAL   = 5     # Save to TSV every N batches
+BATCH_SIZE      = 10    # may need to lower this if accuracy is atrocious
+PREFERRED_MODEL = "qwen2.5:32b"#"llama3.2-vision:11b"
+SAVE_INTERVAL   = 1     # Save to TSV every N batches
 
 # Global variables for model state
 is_loaded    = False
@@ -87,12 +87,17 @@ class ProcessingMetrics:
                 - est_remaining: Estimated time remaining
         """
         elapsed = (datetime.now() - self.start_time).total_seconds()
+        est_remaining = (elapsed/self.completed_locations * (self.total_locations-self.completed_locations)) if self.completed_locations else 0
+        if est_remaining > 3600:
+            est_remaining = f"{est_remaining/3600:.1f}h"
+        elif est_remaining > 60:
+            est_remaining = f"{est_remaining/60:.1f}m"
         return {
             'runtime': f"{elapsed:.1f}s",
             'avg_batch_time': f"{sum(self.batch_times)/len(self.batch_times):.2f}s" if self.batch_times else "N/A",
             'avg_location_time': f"{sum(self.location_times)/len(self.location_times):.2f}s" if self.location_times else "N/A",
             'completion': f"{self.completed_locations}/{self.total_locations} ({(self.completed_locations/self.total_locations*100):.1f}%)" if self.total_locations else "0/0 (0%)",
-            'est_remaining': f"{(elapsed/self.completed_locations * (self.total_locations-self.completed_locations)):.1f}s" if self.completed_locations else "N/A"
+            'est_remaining': f"{est_remaining}"
         }
     
     def print_progress(self):
@@ -109,6 +114,13 @@ class ProcessingMetrics:
         print(f"Estimated remaining: {Style.BRIGHT}{stats['est_remaining']}{Style.RESET_ALL}")
 
 
+###############################################################################
+#                                                                             #
+#     LocationCleaner: Main class for cleaning location data using Ollama     #
+#                                                                             #
+###############################################################################
+
+
 class LocationCleaner:
     def __init__(self, input_tsv: str, output_tsv: str, diagnostics: bool = False):
         """
@@ -120,7 +132,7 @@ class LocationCleaner:
         """
         self.input_tsv = input_tsv
         self.output_tsv = output_tsv
-        self.corrections = {}
+        self.corrections = {} # Running list of corrections
         self.load_existing_corrections()
         self.client = ollama.AsyncClient()
         if diagnostics:
@@ -159,7 +171,7 @@ class LocationCleaner:
                 log(f"Failed to pull model: {Style.DIM}{model_name}{Style.NORMAL}: {e}", level="ERROR")
                 return False
 
-        log(f"Model {Style.DIM}{model_name}{Style.NORMAL} loaded successfully.")
+        log(f"Model {Style.DIM}{model_name}{Style.NORMAL} loaded successfully.\n")
         is_loaded = True
         loaded_model = model_name
         return True
@@ -188,6 +200,11 @@ class LocationCleaner:
             }
             for bad, new in self.corrections.items()
         ])
+
+        # Remove rows where the new values are the same as the old
+        # df = df[df[['bad_city', 'bad_state', 'bad_country']] != df[['new_city', 'new_state', 'new_country']].values]
+
+        # if not df.empty:
         df.to_csv(self.output_tsv, sep='\t', index=False)
         log(f"Saved {len(self.corrections)} corrections to {local_filename(self.output_tsv)}.", color=Fore.LIGHTGREEN_EX)
 
@@ -212,7 +229,7 @@ class LocationCleaner:
     - Always return 3-element arrays for locations: [city, state, country]
     - Country codes must be 2 letters (e.g., "US", "GB", "DE")
     - Return exact input if any uncertainty exists
-    - Standardized format for unknown entries where the other two are known: [null, "value", "value"]
+    - If one of the values is unknown, return the original value even if the other values have been corrected (i.e. ['seatttle', 'wa', 'unknown'] -> ['Seattle', 'WA', 'unknown'])
     - Focus on low character-change corrections. For example, changing "ato, nj" to "Atco, NJ" is better than "Atlantic City, NJ"
     - DO NOT CORRECT LOCATIONS TO THE MOST POPULAR CITY/STATE/COUNTRY. ONLY CORRECT BASED ON POTENTIAL TYPOGRAPHICAL ERRORS, MISPELLINGS, OR OTHER OBVIOUS MISTAKES.
 
@@ -244,16 +261,19 @@ Input locations (as [city, state, country]):
 
 Respond with a JSON array containing objects with 'original' and 'corrected' arrays for each location.
 Example response format:
-[
-    {{
-        "original": ["new yoork", "ny", "us"],
-        "corrected": ["New York", "NY", "US"]
-    }},
-    {{
-        "original": ["sãn josé", "ca", "us"],
-        "corrected": ["San Jose", "CA", "US"]
-    }}
-]"""
+{{
+    locations: [
+        {{
+            "original": ["new yoork", "ny", "us"],
+            "corrected": ["New York", "NY", "US"]
+        }},
+        {{
+            "original": ["sãn josé", "ca", "us"],
+            "corrected": ["San Jose", "CA", "US"]
+        }}
+    ]
+}}
+"""
         return prompt
     
     async def get_corrections_async(self, locations: List[Tuple[str, str, str]], model_name: str = PREFERRED_MODEL, temp: float = 0.0) -> Optional[Dict]:
@@ -297,13 +317,21 @@ Example response format:
                 format="json",
                 options={"temperature": temp}
             )
-            print("Raw Response:")
-            print(json.loads(response['message']['content']))
+            #print("Raw Response:")
+            #print(json.loads(response['message']['content']))
 
             #log(f"Output generated in {datetime.now() - start_time}.", color=Fore.LIGHTMAGENTA_EX)
 
             try:
-                corrections = json.loads(response['message']['content'])
+                corrections = response['message']['content']
+                # Ensure it starts with the list characters
+                corrections = corrections.strip()
+                corrections = json.loads(corrections)
+                if 'locations' not in corrections:
+                    log(f"Unexpected response format: {corrections}", level="ERROR")
+                    return {loc: loc for loc in locations}
+                corrections = corrections['locations']
+
                 result = {}
 
                 #print(type(corrections))
@@ -311,22 +339,24 @@ Example response format:
                 
                 # Handle both single dictionary and list of dictionaries
                 # (possible if batch size is 1)
-                if isinstance(corrections, dict):
-                    # Single correction
-                    original  = corrections.get('original')
-                    corrected = corrections.get('corrected')
+                # if isinstance(corrections, dict):
+                #     # Single correction
+                #     original  = corrections.get('original')
+                #     corrected = corrections.get('corrected')
                     
-                    #log(f"Single correction - Original: {original}, Corrected: {corrected}")
+                #     #log(f"Single correction - Original: {original}, Corrected: {corrected}")
                     
-                    if (isinstance(original, (list, tuple)) and len(original) == 3 and 
-                        isinstance(corrected, (list, tuple)) and len(corrected) == 3):
-                        # Always store with lowercase key and properly capitalized value
-                        key = tuple(str(x).lower() for x in original)
-                        result[key] = tuple(corrected)
+                #     if (isinstance(original, (list, tuple)) and len(original) == 3 and 
+                #         isinstance(corrected, (list, tuple)) and len(corrected) == 3):
+                #         # Always store with lowercase key and properly capitalized value
+                #         key = tuple(str(x).lower() for x in original)
+                #         result[key] = tuple(corrected)
                 
-                elif isinstance(corrections, list):
+                if isinstance(corrections, list):
+                    #print("List of corrections")
                     # List of corrections
                     for correction in corrections:
+                        #log(f"Correction: {correction}")
                         if not isinstance(correction, dict):
                             log(f"Skipping invalid correction format: {correction}", level="WARNING")
                             continue
@@ -334,20 +364,25 @@ Example response format:
                         original  = correction.get('original')
                         corrected = correction.get('corrected')
                         
-                        #log(f"List correction - Original: {original}, Corrected: {corrected}")
+                        #log(f"[internal] {original} -> {corrected}")
                         
-                        if (isinstance(original, (list, tuple)) and len(original) == 3 and 
-                            isinstance(corrected, (list, tuple)) and len(corrected) == 3):
-                            result[tuple(original)] = tuple(corrected)
+                        if (isinstance(original, list) and len(original) == 3 and 
+                            isinstance(corrected, list) and len(corrected) == 3):
+                            result[tuple(str(x).lower() for x in original)] = tuple(corrected)
+                        else:
+                            log(f"Skipping invalid correction format: {correction}", level="WARNING")
                 
                 else:
                     log(f"Unexpected response format: {corrections}", level="ERROR")
 
                 # For locations not handled, store lowercase -> lowercase
                 for loc in locations:
-                    loc_lower = tuple(str(x).lower() for x in loc)
-                    if loc_lower not in result:
-                        result[loc_lower] = loc_lower
+                    # annoying but have to lowercase and the LLM saves as none instead of nan
+                    loc_lower_nan  = tuple(str(x).lower().replace('none', 'nan') for x in loc)
+                    loc_lower_none = tuple(str(x).lower().replace('nan', 'none') for x in loc)
+                    #log(f"Checking for {loc_lower} in corrections.")
+                    if loc_lower_nan not in result and loc_lower_none not in result:
+                        result[loc_lower_nan] = loc_lower_nan
 
                 return result
             except json.JSONDecodeError:
@@ -355,7 +390,7 @@ Example response format:
                 return {loc: loc for loc in locations}
 
         except Exception as e:
-            log(f"Error in Ollama API call: {e}", level="ERROR")
+            log(f"Error in Ollama generation: {e}", level="ERROR")
             return {loc: loc for loc in locations}
         
     async def process_locations(self):
@@ -396,13 +431,13 @@ Example response format:
             batch_corrections = await self.get_corrections_async(batch)
             if batch_corrections:
                 # Update the corrections
-                print("CURRENT CORRECTIONS:")
-                print(self.corrections)
-                print("BATCH CORRECTIONS:")
-                print(batch_corrections)
+                # print("CURRENT CORRECTIONS:")
+                # print(self.corrections)
+                # print("BATCH CORRECTIONS:")
+                # print(batch_corrections)
                 self.corrections.update(batch_corrections)
-                print("\nUPDATED CORRECTIONS:")
-                print(self.corrections)
+                # print("\nUPDATED CORRECTIONS:")
+                # print(self.corrections)
             
             batch_time = time.time() - batch_start
             if self.metrics:
@@ -436,7 +471,7 @@ async def main():
     cleaner = LocationCleaner(
         input_tsv  = os.path.join(project_root, "data", "geolocation", "city_coordinates.tsv"),
         output_tsv = os.path.join(project_root, "data", "geolocation", "location_corrections.tsv"),
-        diagnostics=False
+        diagnostics=True
     )
 
     # Start displaying timing stuff
@@ -461,8 +496,9 @@ async def test():
         #("ardvark", "zz", "us")
     ]
     corrections = await cleaner.get_corrections_async(demo_locations)
-    print(corrections)
+    for original, corrected in corrections.items():
+        print(f"  - {original} -> {corrected}")
 
 if __name__ == "__main__":
-    #asyncio.run(main())
-    asyncio.run(test())
+    asyncio.run(main())
+    # asyncio.run(test())
