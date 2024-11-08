@@ -2,5 +2,6 @@ colorama==0.4.6
 flask==3.0.3
 geopy==2.4.1
 numpy==1.26.4
+ollama==0.3.3
 pandas==2.2.3
 tqdm==4.66.5
