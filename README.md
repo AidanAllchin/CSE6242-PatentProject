@@ -47,7 +47,14 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. The script `python main.py` will walk through the steps to generate the `.tsv` files we'll be using for the remainder of the project. It's the only file that needs to be run. The menu items are designed to be run sequentially.
+1. Requires downloading of `city_coordinates.tsv` and `location_corrections.tsv` from the SharePoint in the `data` folder.
+
+- Pull the GitHub repo
+- Run `python main.py`
+- Before selecting a menu option, place these two files in the newly created `/data/geolocation` folder
+- Proceed with step 2
+
+2. The script `python main.py` will walk through the steps to generate the `.tsv` files we'll be using for the remainder of the project. It's the only file that needs to be run. The menu items are designed to be run sequentially.
 
 This script will:
 
