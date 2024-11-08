@@ -477,6 +477,13 @@ async def display_metrics_task(metrics: ProcessingMetrics):
         await asyncio.sleep(1)
 
 async def main():
+    log(f"\nStarting local-LLM location cleaner.", color=Fore.LIGHTBLUE_EX)
+    log(f"DO NOT RUN THIS ON A LAPTOP.", level="WARNING")
+    i = input("Seriously - are you sure you want to continue? (y/n): ")
+    if i.lower() != 'y':
+        log("Exiting.", level="ERROR")
+        return
+
     cleaner = LocationCleaner(
         input_tsv  = os.path.join(project_root, "data", "geolocation", "city_coordinates.tsv"),
         output_tsv = os.path.join(project_root, "data", "geolocation", "location_corrections.tsv"),

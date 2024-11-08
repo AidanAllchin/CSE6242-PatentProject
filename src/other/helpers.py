@@ -104,12 +104,20 @@ def get_coordinates_for_city(city: str, country: str, state: str = None) -> tupl
         tuple: The latitude and longitude of the city, or (0.0, 0.0) if not found after all retries.
     """
     geolocator = Nominatim(user_agent="patent_project_geocoder")
+
+    if state and str(state).lower() == 'nan' or str(state).lower() == 'none':
+        state = None
     
-    # Crazy how QUEUE is just Q with 4 silent letters after it
+    # switcharoo
+    if (str(city).lower() == 'nan' or str(city).lower() == 'none') and state:
+        city = state
+        state = None
+    
     query = f"{city}, "
     if state:
         query += f"{state}, "
-    query += country
+    if str(country).lower() != 'nan' and str(country).lower() != 'none':
+        query += str(country) 
 
     max_retries = 10  # Maximum number of retries (I may just set this to 1000)
     base_delay  = 1   # Base delay (s)
@@ -121,7 +129,7 @@ def get_coordinates_for_city(city: str, country: str, state: str = None) -> tupl
             if location:
                 return (location.latitude, location.longitude)
             else:
-                log(f"Could not find coordinates for {query}", level="WARNING")
+                #log(f"Could not find coordinates for {query}", level="WARNING")
                 return 0.0, 0.0
         except (GeocoderTimedOut, GeocoderUnavailable) as e:
             delay = min(max_delay, base_delay * (2 ** attempt) + random.uniform(0, 1)) # Exponential backoff with jitter (little wiggle to prevent identical requests)

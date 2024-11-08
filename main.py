@@ -23,19 +23,12 @@ sys.path.insert(0, str(project_root))
 import json
 import subprocess
 
-# Test all imports
-try:
-    from colorama import Fore, Style
-    import pandas as pd  # Note: Not used here but we want to make sure it works
-    import numpy as np   # Note: Not used here but we want to make sure it works
-    import geopy         # Note: Not used here but we want to make sure it works
-    from tqdm import tqdm# Note: Not used here but we want to make sure it works
-    from src.other.helpers import log, local_filename
-    from src.objects.patent import Patent
-except ImportError as e:
-    subprocess.run(["python3", "__init__.py"], check=True)
-    log(f"Error importing modules: {e}", color=Fore.RED)
-    log(f"Ensure you have run `pip install -r requirements.txt` or manually run `python __init__.py", color=Fore.RED)
+# This does all the setup steps for the project - don't modify it
+subprocess.run(['python3', '__init__.py'])
+
+from colorama import Fore, Style
+from src.other.helpers import log
+from src.data_cleaning.patent_cleanup import add_coordinates, add_fips_codes
 
 
 ###############################################################################
@@ -64,10 +57,15 @@ def get_patent_data():
     result is `<root>/data/processed_patents.tsv`.
     """
     try:
-        subprocess.run(["python3", "src/data_cleaning/patent_data.py"], check=True)
+        subprocess.run(["python3", "src/data_cleaning/import_data.py"], check=True)
         print()
     except subprocess.CalledProcessError as e:
-        print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `patent_data.py`: {e}{Style.RESET_ALL}\n")
+        print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `import_data.py`: {e}{Style.RESET_ALL}\n")
+
+    # Let em do what it does
+    add_coordinates()
+    add_fips_codes()
+
 
 def get_bea_data():
     """
@@ -103,7 +101,7 @@ def create_model_predictors():
     variables for each county in the US, for each time period. Also generates
     an `innovation_score` for each region/time to use as a response variable.
 
-    Should result in a `<root>/data/model.tsv` file.
+    Should result in a `<root>/data/to_train.tsv` file.
     """
     pass
 

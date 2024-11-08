@@ -16,11 +16,6 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-import subprocess
-
-# This does all the setup steps for the project - don't modify it
-subprocess.run(['python3', '__init__.py'])
-
 # Below the subprocess line assumes __init__.py has been run
 import pandas as pd
 import time
