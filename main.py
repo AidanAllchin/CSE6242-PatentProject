@@ -122,7 +122,7 @@ def main():
     while True:
         option = display_menu()
         if option == "1":
-            user_input = input(f"Please ensure you have downloaded {Style.DIM}`city_coordinates.tsv`{Style.NORMAL} first and are using the correct python environment. Continue? (y/n): ")
+            user_input = input(f"Please ensure you have downloaded {Style.DIM}city_coordinates.tsv{Style.NORMAL} and {Style.DIM}location_coordinates.tsv{Style.NORMAL} first and are using the correct python environment. Continue? (y/n): ")
             if user_input.lower() == "y":
                 get_patent_data()
             else: print()

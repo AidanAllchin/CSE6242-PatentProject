@@ -70,6 +70,15 @@ def add_coordinates():
         log(f"City coordinates file not found at {local_filename(LOCATIONS_TSV_PATH)}. Creating cache (this may take >1hr)...", level="ERROR")
         create_city_coordinates_cache(patents=patents)
 
+    use_corrections = True
+    # Use corrections if less than 74% of city coordinates have been added
+    locs = pd.read_csv(LOCATIONS_TSV_PATH, sep='\t')
+    num_zeros = len(locs[(locs['latitude'] == 0.0) & (locs['longitude'] == 0.0)])
+    log(f"% of city coordinates with 0.0 for latitude and longitude: {num_zeros / len(locs) * 100:.2f}%")
+    # if num_zeros / len(locs) < 0.26:
+    #     use_corrections = False
+    del locs
+
     if not os.path.exists(CORRECTIONS_PATH):
         log(f"Location corrections file not found at {local_filename(CORRECTIONS_PATH)}.", level="ERROR")
         i = input("Are you sure you want to continue without location corrections? (y/n): ")
