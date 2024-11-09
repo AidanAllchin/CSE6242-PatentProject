@@ -28,7 +28,8 @@ subprocess.run(['python3', '__init__.py'])
 
 from colorama import Fore, Style
 from src.other.helpers import log
-from src.data_cleaning.patent_cleanup import add_coordinates, add_fips_codes
+from src.data_cleaning.patent_cleanup import add_coordinates
+from src.data_cleaning.patent_fips import add_fips_codes
 
 
 ###############################################################################

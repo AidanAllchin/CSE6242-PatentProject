@@ -26,12 +26,6 @@ from tqdm import tqdm
 from src.objects.patent import Patent
 from src.other.helpers import log, get_coordinates_for_city, local_filename, completion_time
 
-# Conceptual steps:
-# 1. Convert Classifications (IPC and CPC) to their meanings
-# 2. Convert Dates to a consistent format
-# 3. Convert Patent Status to a more readable format
-# 4. Add latitude and longitude to all locations
-
 
 ###############################################################################
 #                                   SETUP                                     #
@@ -107,62 +101,6 @@ def add_coordinates():
     log(f"Removed {num_removed} patents with 0.0 for latitude and longitude in either inventor or assignee locations.", color=Fore.CYAN)
     log(f"Lost {num_removed / num_patents * 100:.2f}% of patents due to missing coordinates.", color_full=True)
 
-def api_request_coordinates(location_id: str) -> Tuple[float, float, str]:
-    """
-    Request location coordinates from USPTO PatentsView API
-    NOTE: Currently not working due to poor API documentation - waiting for email back from USPTO
-    
-    Args:
-        location_id: Location ID to look up
-        api_key: USPTO API key required for authentication
-        
-    Returns:
-        Tuple of (latitude, longitude, county_fips)
-    """
-    base_url = "https://search.patentsview.org/api/v1/location/"
-    
-    # Add the location ID directly to URL for GET request
-    url = f"{base_url}{location_id}/"
-
-    params = {
-        'q': json.dumps({"location_id": location_id}),
-        'f': json.dumps([
-            "location_latitude",
-            "location_longitude",
-            "location_county_fips",
-            "location_id"
-        ])
-    }
-    
-    headers = {
-        "X-Api-Key": USPTO_API_KEY
-    }
-    
-    response = requests.get(url, headers=headers, params=params)
-    
-    if response.status_code == 429:
-        log("API limit reached. Waiting 1 minute...", level="WARNING")
-        time.sleep(61)
-        return api_request_coordinates(location_id)
-    
-    elif response.status_code != 200:
-        print(f"Error: {response.status_code}")
-        print(response.text)
-        return 0.0, 0.0, ""
-    
-    data = response.json()
-    
-    # Extract location data from response
-    try:
-        location = data['locations'][0]
-        return (
-            location.get('location_latitude', 0.0),
-            location.get('location_longitude', 0.0),
-            location.get('location_county_fips', '')
-        )
-    except (KeyError, IndexError, TypeError):
-        print("Could not find location data in response")
-        return 0.0, 0.0, ""
 
 # Function for creating the cache of city coordinates (stored in a CSV file)
 # This should not be run by team members, but the result will be shared with the team
@@ -424,7 +362,8 @@ def final_merge_and_clean(batch_size: int = 10000):
     #   - If found, update the coordinate lookup key
     #   - Add the coordinates if they exist
 
-    log("Updating patent location names...")
+    log(f"Updating patent location names. Estimated completion time: {completion_time(70)}.", color=Fore.LIGHTMAGENTA_EX)
+    p_names_start = time.time()
     location_updates = 0
     total_patents = 0
 
@@ -470,6 +409,8 @@ def final_merge_and_clean(batch_size: int = 10000):
         
         # Write chunk to interim file
         chunk.to_csv(INTERIM_PATENTS_PATH, sep='\t', index=False, mode='a', header=not os.path.exists(INTERIM_PATENTS_PATH))
+
+    log(f"Updated {location_updates} location names in {(time.time() - p_names_start)/60:.2f} minutes.")
 
     #######################################################################
     #       Step 4: Add coordinates to patents using lowercase lookup     #
@@ -551,7 +492,8 @@ def final_merge_and_clean(batch_size: int = 10000):
 def clean_coordinate_info():
     """
     Clean the coordinate tsv file. This should only be called after the cache
-    has been created in the `create_city_coordinates_cache` function.
+    has been created in the `create_city_coordinates_cache` function, and 
+    before the corrections/final merge process.
     """
     # Ensure coords dir exists
     os.makedirs(os.path.dirname(LOCATIONS_TSV_PATH), exist_ok=True)
@@ -578,23 +520,6 @@ def clean_coordinate_info():
     df.to_csv(LOCATIONS_TSV_PATH, sep='\t', index=False)
     log(f"Cleaned city coordinates saved to {local_filename(LOCATIONS_TSV_PATH)}", color=Fore.GREEN)
 
-
-###############################################################################
-#                               Mapping to FIPS                               #
-###############################################################################
-
-
-# Each US county has it's own unique FIPS code. After adding a latitude and 
-# longitude for each patent we can use those to determine which county the 
-# patent originated from, and can add the FIPS code (uid for US county) to each
-# patent, which we will later group on.
-
-def add_fips_codes():
-    """
-    Add FIPS codes to each patent based on the latitude and longitude of the
-    inventor and assignee locations.
-    """
-    return # This one is gonna be tough
 
 
 #add_coordinates(pd.read_csv(os.path.join(project_root, 'data/processed_patents.tsv'), sep='\t'))
