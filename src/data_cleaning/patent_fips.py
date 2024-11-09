@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 """
-Created: Fri Nov 09 2024
+Created: Fri Nov 08 2024
 Author: Aidan Allchin
 
 Each US county has it's own unique FIPS code. After adding a latitude and 
@@ -23,10 +23,13 @@ project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from colorama import Fore, Style
-import numpy as np
 from typing import Tuple, Dict, Optional
 import requests
 import time
+from rtree import index
+import json
+from shapely.geometry import shape, Point
+from rich.progress import Progress
 import random
 from tqdm import tqdm
 import pandas as pd
@@ -34,9 +37,19 @@ from src.other.helpers import log
 
 # Path to the final patents file
 FINAL_PATENTS_PATH = os.path.join(project_root, "data", "patents.tsv")
+BOUNDARY_GEOJSON_P = os.path.join(project_root, "data", "geolocation", "county_boundaries.geojson")
 
 
-def get_county_info_from_coords(lat: float, lon: float, cache: Dict = None) -> Optional[Tuple[str, str]]:
+###############################################################################
+#                                                                             #
+#                           CENSUS GEOCODING API                              #
+#                                                                             #
+###############################################################################
+
+# This was going to take 11 days to run, so I'm replacing it with a local 
+# version using the R-tree spatial index and the county boundary GeoJSON file.
+
+def get_county_info_from_coords_api(lat: float, lon: float, cache: Dict = None) -> Optional[Tuple[str, str]]:
     """
     Get county name and FIPS code for given coordinates using Census Geocoding 
     API. Uses a cache to avoid repeated API calls for the same coordinates.
@@ -130,13 +143,111 @@ def get_county_info_from_coords(lat: float, lon: float, cache: Dict = None) -> O
     log(f"Failed to get county info for ({lat}, {lon}) after {max_retries} attempts", level="ERROR")
     return None
 
-def add_county_info_to_patents(df: pd.DataFrame, batch_size: int = 25) -> pd.DataFrame:
+
+###############################################################################
+#                                                                             #
+#                           LOCAL SPATIAL INDEXING                            #
+#                                                                             #
+###############################################################################
+
+
+def initialize_spatial_index(geojson_path: str) -> Tuple[index.Index, list]:
+    """
+    Initialize an R-tree spatial index from county boundary GeoJSON data.
+    
+    Args:
+        geojson_path: Path to the county boundaries GeoJSON file
+        
+    Returns:
+        Tuple of (rtree_index, county_polygons)
+    """
+    # Load GeoJSON data
+    with open(geojson_path, "r") as f:
+        geojson_data = json.load(f)
+
+    # Initialize R-tree index and polygon storage
+    idx = index.Index()
+    county_polygons = []
+    
+    # Build out the spatial index
+    with Progress() as progress:
+        task = progress.add_task(
+            "[cyan]Building county boundaries spatial index...", 
+            total=len(geojson_data["features"])
+        )
+        
+        for pos, feature in enumerate(geojson_data["features"]):
+            # Extract geometry and properties
+            geom = shape(feature["geometry"])
+            props = feature["properties"]
+            
+            # Store polygon and properties
+            county_polygons.append((props, geom))
+            
+            # Insert polygon bounds into R-tree
+            idx.insert(pos, geom.bounds)
+            
+            progress.update(task, advance=1)
+    
+    return idx, county_polygons
+
+def get_county_info_from_coords(lat: float, lon: float, rtree_idx: index.Index, county_polygons: list, cache: Dict = None) -> Optional[Tuple[str, str]]:
+    """
+    Get county name and FIPS code for given coordinates using local spatial index.
+    
+    Args:
+        lat: Latitude
+        lon: Longitude
+        rtree_idx: R-tree spatial index
+        county_polygons: List of (properties, polygon) tuples
+        cache: Optional dictionary to cache results
+        
+    Returns:
+        Tuple of (county_name, fips_code) or None if not found
+    """
+    if cache is None:
+        cache = {}
+        
+    # Round coordinates for cache key
+    coord_key = (round(lat, 4), round(lon, 4))
+    
+    # Check cache first
+    if coord_key in cache:
+        return cache[coord_key]
+    
+    point = Point(lon, lat)
+    
+    # Query R-tree for candidate polygons
+    candidate_idxs = list(rtree_idx.intersection((lon, lat, lon, lat)))
+    
+    for idx_candidate in candidate_idxs:
+        props, polygon = county_polygons[idx_candidate]
+        if polygon.contains(point):
+            # Extract county name and FIPS from properties
+            county_name = props.get("name", "")
+            state_fips  = props.get("statefp", "")
+            county_fips = props.get("countyfp", "")
+            
+            # Ensure FIPS codes are padded correctly
+            state_fips  = state_fips.zfill(2)
+            county_fips = county_fips.zfill(3)
+            full_fips   = f"{state_fips}{county_fips}"
+            
+            # Cache the result
+            cache[coord_key] = (county_name, full_fips)
+            return county_name, full_fips
+            
+    return None
+
+def add_county_info_to_patents(df: pd.DataFrame, rtree_idx: index.Index, county_polygons: list, batch_size: int = 1000) -> pd.DataFrame:
     """
     Add county name and FIPS code columns to patents dataframe.
     Processes in batches to handle large datasets efficiently.
     
     Args:
         df: Patents dataframe with latitude/longitude columns
+        rtree_idx: R-tree spatial index
+        county_polygons: List of (properties, polygon) tuples
         batch_size: Number of records to process per batch
         
     Returns:
@@ -172,8 +283,10 @@ def add_county_info_to_patents(df: pd.DataFrame, batch_size: int = 25) -> pd.Dat
                 #print(f"types: {type(row['inventor_latitude'])}, {type(row['inventor_longitude'])}")
 
                 county_info = get_county_info_from_coords(
-                    row['inventor_latitude'], 
+                    row['inventor_latitude'],
                     row['inventor_longitude'],
+                    rtree_idx,
+                    county_polygons,
                     coord_cache
                 )
                 if county_info:
@@ -189,8 +302,10 @@ def add_county_info_to_patents(df: pd.DataFrame, batch_size: int = 25) -> pd.Dat
                 #print(f"types: {type(row['assignee_latitude'])}, {type(row['assignee_longitude'])}")
 
                 county_info = get_county_info_from_coords(
-                    row['assignee_latitude'], 
+                    row['assignee_latitude'],
                     row['assignee_longitude'],
+                    rtree_idx,
+                    county_polygons,
                     coord_cache
                 )
                 if county_info:
@@ -206,27 +321,33 @@ def add_fips_codes():
     """
     Main function to add FIPS codes to the patents dataset.
     """
+    if not os.path.exists(BOUNDARY_GEOJSON_P):
+        log(f"County boundaries GeoJSON not found at {BOUNDARY_GEOJSON_P}", level="ERROR")
+        return
+        
+    # Initialize spatial index
+    log("Initializing spatial index...", color=Fore.CYAN)
+    rtree_idx, county_polygons = initialize_spatial_index(BOUNDARY_GEOJSON_P)
+
     log("Reading patents file...", color=Fore.CYAN)
     df = pd.read_csv(FINAL_PATENTS_PATH, sep='\t')
     
     # Add county information
     log("\nAdding county information to patents...", color=Fore.CYAN)
-    df = add_county_info_to_patents(df)
-    
+    df = add_county_info_to_patents(df, rtree_idx, county_polygons)
     
     # Save final results
     log("\nSaving updated patents file...", color=Fore.CYAN)
     df.to_csv(FINAL_PATENTS_PATH, sep='\t', index=False)
     
-    # Print summary statistics
-    total_patents = len(df)
+    total_patents    = len(df)
     inventor_success = len(df[df['inventor_fips'] != ''])
     assignee_success = len(df[df['assignee_fips'] != ''])
     
     log(f"\nResults:", color=Fore.GREEN)
-    log(f"Total patents processed: {total_patents}", color=Fore.GREEN)
-    log(f"Patents with inventor FIPS: {inventor_success} ({inventor_success/total_patents*100:.1f}%)", color=Fore.GREEN)
-    log(f"Patents with assignee FIPS: {assignee_success} ({assignee_success/total_patents*100:.1f}%)", color=Fore.GREEN)
+    log(f"Total patents processed: {total_patents}", color=Fore.LIGHTGREEN_EX)
+    log(f"Patents with inventor FIPS: {inventor_success} ({inventor_success/total_patents*100:.1f}%)", color=Fore.LIGHTGREEN_EX)
+    log(f"Patents with assignee FIPS: {assignee_success} ({assignee_success/total_patents*100:.1f}%)", color=Fore.LIGHTGREEN_EX)
 
 if __name__ == "__main__":
     add_fips_codes()

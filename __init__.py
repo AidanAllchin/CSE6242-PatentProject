@@ -338,7 +338,8 @@ def fetch_bea_raw_tables():
                 os.remove(os.path.join(RAW_DATA_PATH, f))
 
 def fetch_helper_tables():
-    fips_converter_p = os.path.join(RAW_DATA_PATH, '..', 'census', 'fips_to_county.tsv')
+    fips_converter_p    = os.path.join(RAW_DATA_PATH, '..', 'census', 'fips_to_county.tsv')
+    county_boundaries_p = os.path.join(RAW_DATA_PATH, '..', 'geolocation', 'county_boundaries.geojson')
 
     print(f"\n{Style.BRIGHT}{Fore.CYAN}--- DOWNLOADING HELPER TABLES ---{Style.RESET_ALL}")
 
@@ -346,12 +347,23 @@ def fetch_helper_tables():
         print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}fips_to_county.tsv{Style.NORMAL}...{Style.RESET_ALL}")
         os_specific_download("https://raw.githubusercontent.com/ChuckConnell/articles/refs/heads/master/fips2county.tsv", fips_converter_p)
 
-    print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}All helper tables downloaded.{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}Downloaded {Style.DIM}fips_to_county.tsv{Style.NORMAL}.{Style.RESET_ALL}")
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}fips_to_county.tsv already exists.{Style.RESET_ALL}")
 
+    if not os.path.exists(county_boundaries_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}county_boundaries.geojson{Style.NORMAL}...{Style.RESET_ALL}")
+        os_specific_download("https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/us-county-boundaries/exports/geojson?lang=en&timezone=America%2FNew_York", county_boundaries_p)
+
+        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}Downloaded {Style.DIM}county_boundaries.geojson{Style.NORMAL}.{Style.RESET_ALL}")
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}county_boundaries.geojson already exists.{Style.RESET_ALL}")
+
+    print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}All helper tables downloaded.{Style.RESET_ALL}")
 
 
 fetch_patent_raw_data()
 fetch_bea_raw_tables()
 fetch_helper_tables()
 
-print(f"{Style.BRIGHT}{Fore.GREEN}[__init__.py]:{Style.NORMAL} Initialization complete.{Style.RESET_ALL}")
+print(f"\n{Style.BRIGHT}{Fore.GREEN}[__init__.py]: Initialization complete.{Style.RESET_ALL}")
