@@ -5,8 +5,7 @@ Created: Wed Oct 30 2024
 Author: Aidan Allchin
 
 This is a script version of the Jupyter notebook designed for automated data
-download, merging, and cleaning. This is some ugly ass code, but she does the 
-job.
+download, merging, and cleaning. This is some ugly code, but she does the job.
 """
 import os, sys
 from pathlib import Path
@@ -21,7 +20,11 @@ import pandas as pd
 import time
 import warnings
 from colorama import Fore, Style
-from src.other.helpers import log, local_filename, completion_time
+from src.other.helpers import local_filename, completion_time
+from src.other.logging import PatentLogger
+
+# Initialize logger
+logger = PatentLogger.get_logger(__name__)
 
 # Shut up
 warnings.filterwarnings("ignore")
@@ -31,7 +34,7 @@ dest_path = os.path.join(os.getcwd(), 'data', 'processed_patents.tsv')
 if os.path.exists(dest_path):
     i = input(f"Looks like this has already been run: {Style.DIM}{local_filename(dest_path)}{Style.NORMAL} already exists. Overwrite? (y/n): ")
     if i.lower() != 'y':
-        log("Aborting the initial cleaning steps.", level="WARNING")
+        logger.warning("Aborting the initial cleaning steps.")
         sys.exit()
 
 
@@ -45,7 +48,7 @@ if os.path.exists(dest_path):
 RUNTIME = 180 # estimating runtime in seconds
 
 start = time.time()
-log(f"\nGenerating clean patent data. Estimated completion time: {completion_time(RUNTIME)}", color=Fore.CYAN, color_full=True)
+logger.info("\nGenerating clean patent data. Estimated completion time: {}.".format(completion_time(RUNTIME)))
 
 
 # Paths (modified to be relative to the current working directory)
@@ -76,7 +79,7 @@ print(f"  > Loaded table {Style.DIM}assignee_g{Style.NORMAL} ({os.path.getsize(a
 wipo_g = pd.read_csv(wipo_g_p, sep='\t')
 print(f"  > Loaded table {Style.DIM}wipo_g{Style.NORMAL} ({os.path.getsize(wipo_g_p) / 1024**3:.2f}MB)")
 
-log(f"Tables loaded to memory in {time.time() - start:.2f} seconds.", color=Fore.LIGHTBLUE_EX)
+logger.info("Tables loaded to memory in {:.2f} seconds.".format(time.time() - start))
 
 
 ###############################################################################
@@ -88,19 +91,15 @@ log(f"Tables loaded to memory in {time.time() - start:.2f} seconds.", color=Fore
 
 def simplify_applicants():
     global applicant_g
+
     # Simplifying inventor information to just primary inventor (~10s)
     # Getting count of non-unique patent_id rows
     non_uniques = applicant_g[applicant_g.duplicated(subset='patent_id', keep=False)]
-    #print(f"{Style.BRIGHT}Duplicated patent_ids are duplicated because each patent/inventor combo has it's own row:{Style.RESET_ALL}")
-    log(f"Number of non-unique patent_id rows: {len(non_uniques)}.")
+    logger.info(f"Number of non-unique patent_id rows: {len(non_uniques)}.")
 
     just_dupes = non_uniques[non_uniques.duplicated(subset='patent_id', keep='first')]
     num_unique_patents = len(applicant_g['patent_id'].unique())
     print(f"  > Removing all duplicated patent_ids will result in {len(just_dupes)} fewer rows, but we will retain {num_unique_patents} patents (this doesn't change).")
-
-    # Value counts of inventor sequence for full data
-    #print(f"\n{Style.BRIGHT}Value counts of inventor_sequence for the full data:{Style.RESET_ALL}")
-    #print(applicant_g['inventor_sequence'].value_counts().sort_index())
 
     # Drop all rows with inventor_sequence > 0
     applicant_g = applicant_g[applicant_g['inventor_sequence'] == 0].drop(columns=['inventor_sequence', 'deceased_flag'])
@@ -108,18 +107,14 @@ def simplify_applicants():
 
 def simplify_assignees():
     global assignee_g
+
     # Simplifying assignee information to just primary assignee (~10s)
     # Getting count of non-unique patent_id rows
     non_uniques = assignee_g[assignee_g.duplicated(subset='patent_id', keep=False)]
-    #print(f"\n{Style.BRIGHT}Duplicated patent_ids are duplicated because each patent/assignee combo has it's own row:{Style.RESET_ALL}")
 
     just_dupes = non_uniques[non_uniques.duplicated(subset='patent_id', keep='first')]
     num_unique_patents = len(assignee_g['patent_id'].unique())
     print(f"  > Removing all duplicated patent_ids will result in {len(just_dupes)} fewer rows, but we will retain {num_unique_patents} patents.")
-
-    # Value counts of assignee seq for full data
-    #print(f"\n{Style.BRIGHT}Value counts of assignee_sequence for the full data:{Style.RESET_ALL}")
-    #print(assignee_g['assignee_sequence'].value_counts().sort_index())
 
     # Drop all rows with assignee_sequence > 0
     assignee_g = assignee_g[assignee_g['assignee_sequence'] == 0].drop(columns=['assignee_sequence', 'assignee_type'])
@@ -152,7 +147,7 @@ convert_ids()
 
 # Start the timer
 assignee_merge_start = time.time()
-log(f"\nMerging assignee data with location data. Estimated completion time: {completion_time(19)}", color=Fore.LIGHTCYAN_EX)
+logger.info("\nMerging assignee data with location data. Estimated completion time: {}.".format(completion_time(19)))
 
 # Simplifying the table to just what we need (very few first/last names)
 assignee_g = assignee_g[['patent_id', 'raw_assignee_organization', 'rawlocation_id']]
@@ -179,7 +174,7 @@ print(f"  > Assignee data merged with location data in {time.time() - assignee_m
 
 # Start the timer
 applicant_merge_start = time.time()
-log(f"\nMerging applicant data with location data. Estimated completion time: {completion_time(20)}", color=Fore.LIGHTCYAN_EX)
+logger.info("\nMerging applicant data with location data. Estimated completion time: {}.".format(completion_time(20)))
 
 # Simplifying the table to just what we need
 applicant_g = applicant_g.drop(columns=['inventor_id'])
@@ -202,20 +197,16 @@ print(f"  > Applicant data merged with location data in {time.time() - applicant
 
 
 # Now we merge both of those together based on patent_id
-# Start timer
 locations_patents_st = time.time()
-log(f"\nMerging assignee and applicant data. Estimated completion time: {completion_time(8)}", color=Fore.LIGHTCYAN_EX)
+logger.info("\nMerging assignee and applicant data. Estimated completion time: {}.".format(completion_time(8)))
 locations_df = pd.merge(applicant_g, assignee_g, on = 'patent_id', how = 'left')
-
 print(f"  > Merged assignee and applicant data on patent_id in {time.time() - locations_patents_st:.2f}s.")
 
 # Almost done combining (~12s)
-# Start timer
 merge_start = time.time()
-log(f"\nMerging location and patent data together. Estimated completion time: {completion_time(12)}", color=Fore.LIGHTCYAN_EX)
+logger.info("\nMerging location and patent data together. Estimated completion time: {}.".format(completion_time(12)))
 df_no_wipo = pd.merge(patents_g, locations_df, on='patent_id', how='left')
 df_no_wipo = df_no_wipo[df_no_wipo['patent_type'] == "utility"].drop(columns=['patent_type'])
-
 print(f"  > Location and patent data merged in {time.time() - merge_start:.2f} seconds.")
 
 # Explore if there are any state or city information for rows missing countries for either assignee or inventor
@@ -228,7 +219,7 @@ def explore_missing_locs(colprefix: str):
         print(f"  > This is {len(non_na) / len(missing_countries) * 100:.2f}% of the rows with missing countries, and {len(non_na) / len(df_no_wipo) * 100:.2f}% of the total rows.")
     print(f"  > This is too few to be useful, so we're dropping these.")
 
-log(f"Removing patents with improper location information...", color=Fore.LIGHTCYAN_EX)
+logger.info("\nRemoving patents with improper location information...")
 explore_missing_locs('assignee')
 explore_missing_locs('inventor')
 
@@ -238,9 +229,9 @@ df_no_wipo = df_no_wipo.dropna(subset=['inventor_city', 'inventor_state']) # Got
 
 print(f"\n  > {Style.BRIGHT}Current length of the dataframe (# of unique patents with inventor and assignee locations) = {len(df_no_wipo)}.{Style.RESET_ALL}")
 
-# Start timer
+# Now we merge the WIPO data with the patent data
 wipo_merge_start = time.time()
-log(f"\nMerging WIPO data with patent data. Estimated completion time: {completion_time(12)}", color=Fore.LIGHTCYAN_EX)
+logger.info("\nMerging WIPO data with patent data. Estimated completion time: {}.".format(completion_time(12)))
 
 # Merge to get WIPO type for each patent (~10s)
 df = pd.merge(df_no_wipo, wipo_g, on='patent_id', how='left')
@@ -252,15 +243,10 @@ df = df.drop(columns=['wipo_field_sequence', 'wipo_field_id', 'wipo_kind'])
 df['patent_date'] = pd.to_datetime(df['patent_date'])
 df = df[df['patent_date'] >= '2001-01-01'].sort_values('patent_date')
 
-# Also (forgot this earlier) drop all patents not within the US
-# TODO: I'm assuming we're using inventor for predictors and not assignee. Revisit.
+# Also drop all patents not within the US
 df = df[df['inventor_country'] == 'US']
-#print(df['inventor_country'].value_counts())
 duplicates = df[df.duplicated(subset='patent_id', keep=False)]
 print(f"  > Number of duplicated patent_ids: {Style.DIM}{len(duplicates)}{Style.RESET_ALL}")
-
-#print(f"\n{Style.BRIGHT}Some of the duplicated patent_ids:{Style.RESET_ALL}")
-#print(duplicates.head(10))
 print(f"  > Number of unique patent_ids: {Style.DIM}{len(df['patent_id'].unique())}{Style.RESET_ALL}")
 print(f"  > Number of null {Style.DIM}wipo_field_title{Style.NORMAL} values: {Style.DIM}{df['wipo_field_title'].isna().sum()}{Style.RESET_ALL}. Dropping...")
 df = df.dropna(subset=['wipo_field_title'])
@@ -276,29 +262,16 @@ def comma_separate_fields():
     df = df.drop_duplicates(subset='patent_id')
     print(f"  > Combined all {Style.DIM}wipo_field_title{Style.NORMAL} values for each patent into a single cell in {time.time() - combining_st:.2f}s.")
 
-log(f"\nMerging separate WIPO field titles for each patent. Estimated completion time: {completion_time(70)}", color=Fore.LIGHTCYAN_EX)
+logger.info("\nMerging separate WIPO field titles for each patent. Estimated completion time: {}.".format(completion_time(70)))
 comma_separate_fields()
 
 print(f"  > Number of unique assignee organizations: {Style.DIM}{len(df['assignee'].unique())}{Style.RESET_ALL}")
 print(f"  > Number of non-US assignee countries: {Style.DIM}{len(df[df['assignee_country'] != 'US'])}{Style.RESET_ALL}")
-
 print(f"  > WIPO data merged with patent data in {time.time() - wipo_merge_start:.2f} seconds.")
-
 print(f"\n\n{Style.BRIGHT}{Fore.MAGENTA}This leaves us with a total of {len(df)} patents in the US with full information since January 1st, 2001.{Style.RESET_ALL}")
-
-def safe_format():
-    """
-    Iterate through the columns of `df` and 
-    .replace all '\t' in all string columns
-    """
-    for col in df.columns:
-        if isinstance(df[col].dtype, object):
-            df[col] = df[col].str.replace('\t', ' ')
-
-#safe_format() # This isn't working yet
 
 df.to_csv(dest_path, sep='\t', index=False)
 
-log(f"\nData saved to {local_filename(dest_path)}.", color=Fore.LIGHTGREEN_EX)
-log(f"Total runtime: {time.time() - start:.2f} seconds.")
+logger.info("\nData saved to {}.".format(local_filename(dest_path)))
+logger.info("Total runtime: {:.2f} seconds.".format(time.time() - start))
 

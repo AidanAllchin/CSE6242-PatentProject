@@ -22,7 +22,6 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from colorama import Fore, Style
 from typing import Tuple, Dict, Optional
 import requests
 import time
@@ -33,7 +32,10 @@ from rich.progress import Progress
 import random
 from tqdm import tqdm
 import pandas as pd
-from src.other.helpers import log
+from src.other.logging import PatentLogger
+
+# Initialize logger
+logger = PatentLogger.get_logger(__name__)
 
 # Path to the final patents file
 FINAL_PATENTS_PATH = os.path.join(project_root, "data", "patents.tsv")
@@ -96,7 +98,7 @@ def get_county_info_from_coords_api(lat: float, lon: float, cache: Dict = None) 
             # Retry if rate limited
             if response.status_code == 429:
                 delay = min(max_delay, base_delay * (2 ** i) + random.uniform(0, 1))
-                log(f"Rate limited. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})", level="WARNING")
+                logger.warning(f"Rate limited. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})")
                 time.sleep(delay)
                 continue
 
@@ -104,9 +106,7 @@ def get_county_info_from_coords_api(lat: float, lon: float, cache: Dict = None) 
             # so i'm just doing this as well
             elif response.status_code != 200:
                 delay = min(max_delay, base_delay * (2 ** i) + random.uniform(0, 1))
-                #print(response)
-                #print(response.text)
-                log(f"Error {response.status_code}. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})", level="WARNING")
+                logger.warning(f"Error {response.status_code}. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})")
                 time.sleep(delay)
                 continue
 
@@ -128,19 +128,19 @@ def get_county_info_from_coords_api(lat: float, lon: float, cache: Dict = None) 
             
         except requests.exceptions.ReadTimeout:
             delay = min(max_delay, base_delay * (2 ** i) + random.uniform(0, 1))
-            log(f"Request timed out. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})", level="WARNING")
+            logger.warning(f"Request timed out. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})")
             time.sleep(delay)
             
         except requests.exceptions.ConnectionError:
             delay = min(max_delay, base_delay * (2 ** i) + random.uniform(0, 1))
-            log(f"Connection error. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})", level="WARNING")
+            logger.warning(f"Connection error. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})")
             time.sleep(delay)
             
         except Exception as e:
-            log(f"Unexpected error getting county info for coords ({lat}, {lon}): {e}", level="WARNING")
+            logger.exception(f"Unexpected error getting county info for coords ({lat}, {lon}): {e}")
             return None
         
-    log(f"Failed to get county info for ({lat}, {lon}) after {max_retries} attempts", level="ERROR")
+    logger.error(f"Failed to get county info for ({lat}, {lon}) after {max_retries} attempts")
     return None
 
 
@@ -257,18 +257,19 @@ def add_county_info_to_patents(df: pd.DataFrame, rtree_idx: index.Index, county_
     for col in ['inventor_county', 'inventor_fips', 'assignee_county', 'assignee_fips']:
         if col not in df.columns:
             df[col] = ""
-            log(f"Added new column: {col}", color=Fore.CYAN)
+            logger.info(f"Added new column: {col}")
         elif df[col].isnull().all():  # If column exists but is all NULL/NaN
             df[col] = ""
-            log(f"Reset empty column: {col}", color=Fore.CYAN)
+            logger.info(f"Reset empty column: {col}")
         else:
-            log(f"Column {col} already exists with data - skipping creation", level="WARNING")
+            logger.warning(f"Column {col} already exists with data - skipping creation")
     
     # Cache for coordinate lookups
     coord_cache = {}
     
     # Process in batches
-    log(f"Note that the expected time shown below will decrease as the cache fills up.")
+    logger.info(f"Processing patents in batches of {batch_size} records...")
+    logger.info("  > Note that the expected time shown below will decrease as the cache fills up.")
     for i in tqdm(range(0, len(df), batch_size), desc="Adding county info", unit="batch", total=len(df)//batch_size):
         batch = df.iloc[i:i+batch_size]
         
@@ -298,9 +299,6 @@ def add_county_info_to_patents(df: pd.DataFrame, rtree_idx: index.Index, county_
 
             # Process assignee location if coordinates exist
             elif row['assignee_latitude'] != 0.0 and row['assignee_longitude'] != 0.0 and str(row['assignee_latitude']) != "nan" and str(row['assignee_longitude']) != "nan":
-                #print(f"coords: {row['assignee_latitude']}, {row['assignee_longitude']}")
-                #print(f"types: {type(row['assignee_latitude'])}, {type(row['assignee_longitude'])}")
-
                 county_info = get_county_info_from_coords(
                     row['assignee_latitude'],
                     row['assignee_longitude'],
@@ -322,32 +320,33 @@ def add_fips_codes():
     Main function to add FIPS codes to the patents dataset.
     """
     if not os.path.exists(BOUNDARY_GEOJSON_P):
-        log(f"County boundaries GeoJSON not found at {BOUNDARY_GEOJSON_P}", level="ERROR")
+        logger.error(f"County boundaries GeoJSON not found at {BOUNDARY_GEOJSON_P}")
         return
         
     # Initialize spatial index
-    log("Initializing spatial index...", color=Fore.CYAN)
+    logger.info("Initializing spatial index...")
+
     rtree_idx, county_polygons = initialize_spatial_index(BOUNDARY_GEOJSON_P)
 
-    log("Reading patents file...", color=Fore.CYAN)
+    logger.info("Reading patents file...")
     df = pd.read_csv(FINAL_PATENTS_PATH, sep='\t')
     
     # Add county information
-    log("\nAdding county information to patents...", color=Fore.CYAN)
+    logger.info("Adding county information to patents...")
     df = add_county_info_to_patents(df, rtree_idx, county_polygons)
     
     # Save final results
-    log("\nSaving updated patents file...", color=Fore.CYAN)
+    logger.info("\nSaving updated patents file...")
     df.to_csv(FINAL_PATENTS_PATH, sep='\t', index=False)
     
     total_patents    = len(df)
     inventor_success = len(df[df['inventor_fips'] != ''])
     assignee_success = len(df[df['assignee_fips'] != ''])
     
-    log(f"\nResults:", color=Fore.GREEN)
-    log(f"Total patents processed: {total_patents}", color=Fore.LIGHTGREEN_EX)
-    log(f"Patents with inventor FIPS: {inventor_success} ({inventor_success/total_patents*100:.1f}%)", color=Fore.LIGHTGREEN_EX)
-    log(f"Patents with assignee FIPS: {assignee_success} ({assignee_success/total_patents*100:.1f}%)", color=Fore.LIGHTGREEN_EX)
+    logger.info(f"\nResults:")
+    logger.info(f"Total patents processed: {total_patents}")
+    logger.info(f"Patents with inventor FIPS: {inventor_success} ({inventor_success/total_patents*100:.1f}%)")
+    logger.info(f"Patents with assignee FIPS: {assignee_success} ({assignee_success/total_patents*100:.1f}%)")
 
 if __name__ == "__main__":
     add_fips_codes()

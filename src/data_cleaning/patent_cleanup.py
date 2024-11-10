@@ -23,13 +23,17 @@ import pandas as pd
 import json
 import time
 from tqdm import tqdm
-from src.other.helpers import log, get_coordinates_for_city, local_filename, completion_time
+from src.other.logging import PatentLogger
+from src.other.helpers import get_coordinates_for_city, local_filename, completion_time
 
 
 ###############################################################################
 #                                   SETUP                                     #
 ###############################################################################
 
+
+# Initialize logger
+logger = PatentLogger.get_logger(__name__)
 
 with open(os.path.join(project_root, "config", "config.json"), "r") as f:
     config = json.load(f)
@@ -53,7 +57,7 @@ def add_coordinates():
     """
     # Ensure the patents file exists
     if not os.path.exists(PATENTS_PATH):
-        log(f"Patents file not found at {local_filename(PATENTS_PATH)}. Try running from `main.py` and selection option (1).", level="ERROR")
+        logger.error("Patents file not found at {}. Try running from `main.py` and selection option (1).".format(local_filename(PATENTS_PATH)))
         return
     
     # Read the patents file
@@ -61,23 +65,19 @@ def add_coordinates():
 
     # Ensure the city coordinates file exists
     if not os.path.exists(LOCATIONS_TSV_PATH):
-        log(f"City coordinates file not found at {local_filename(LOCATIONS_TSV_PATH)}. Creating cache (this may take >1hr)...", level="ERROR")
+        logger.error("City coordinates file not found at {}. Creating cache (this may take >1hr)...".format(local_filename(LOCATIONS_TSV_PATH)))
         create_city_coordinates_cache(patents=patents)
 
-    use_corrections = True
-    # Use corrections if less than 74% of city coordinates have been added
     locs = pd.read_csv(LOCATIONS_TSV_PATH, sep='\t')
     num_zeros = len(locs[(locs['latitude'] == 0.0) & (locs['longitude'] == 0.0)])
-    log(f"% of city coordinates with 0.0 for latitude and longitude: {num_zeros / len(locs) * 100:.2f}%")
-    # if num_zeros / len(locs) < 0.26:
-    #     use_corrections = False
+    logger.info(f"% of city coordinates with 0.0 for latitude and longitude: {num_zeros / len(locs) * 100:.2f}%")
     del locs
 
     if not os.path.exists(CORRECTIONS_PATH):
-        log(f"Location corrections file not found at {local_filename(CORRECTIONS_PATH)}.", level="ERROR")
+        logger.error("Location corrections file not found at {}. Creating corrections...".format(local_filename(CORRECTIONS_PATH)))
         i = input("Are you sure you want to continue without location corrections? (y/n): ")
         if i.lower() != 'y':
-            log("Exiting...", level="ERROR")
+            logger.error("Exiting...", level="ERROR")
             sys.exit(1)
 
         # Wasn't actually going to use subprocess for this one but it's async
@@ -98,13 +98,9 @@ def add_coordinates():
     num_remaining = len(patents)
     num_removed = num_patents - num_remaining
     patents.to_csv(FINAL_PATENTS_PATH, sep='\t', index=False)
-    log(f"Removed {num_removed} patents with 0.0 for latitude and longitude in either inventor or assignee locations.", color=Fore.CYAN)
-    log(f"Lost {num_removed / num_patents * 100:.2f}% of patents due to missing coordinates.", color_full=True)
+    logger.info(f"Removed {num_removed} patents with 0.0 for latitude and longitude in either inventor or assignee locations.")
+    logger.info(f"Lost {num_removed / num_patents * 100:.2f}% of patents due to missing coordinates.")
 
-
-# Function for creating the cache of city coordinates (stored in a CSV file)
-# This should not be run by team members, but the result will be shared with the team
-# after completion. Not directly part of the pipeline.
 def create_city_coordinates_cache(patents: pd.DataFrame) -> None:
     """
     Create a cache of city coordinates by iterating over all patents and
@@ -116,7 +112,7 @@ def create_city_coordinates_cache(patents: pd.DataFrame) -> None:
     # Ensure coords dir exists
     os.makedirs(os.path.dirname(LOCATIONS_TSV_PATH), exist_ok=True)
 
-    log(f"\nCreating coordinates for each unique city/state/country pair. Estimated completion time: {completion_time(3600)}.", color=Fore.BLUE, color_full=True)
+    logger.info("Creating coordinates for each unique city/state/country pair. Estimated completion time: {}.".format(completion_time(3600)))
 
     # Initial parsing (faster than iterating)
     patents['inventor_city']    = patents['inventor_city'].str.lower()
@@ -141,9 +137,10 @@ def create_city_coordinates_cache(patents: pd.DataFrame) -> None:
         else:
             no_city_counter += 1
 
-    log(f"Found {len(cities)} unique cities.", color=Fore.CYAN)
+    logger.info("Found {} unique cities.".format(len(cities)))
+
     if no_city_counter > 0:
-        log(f"{no_city_counter} entries exist with no city, meaning no coordinates will be added for {no_city_counter * 100 / total_len:.2f}% of the patents.", level="WARNING")
+        logger.warning("{} entries exist with no city, meaning no coordinates will be added for {:.2f}% of the patents.".format(no_city_counter, no_city_counter * 100 / total_len))
     
     # Read existing entries
     existing_cities = set()
@@ -153,9 +150,9 @@ def create_city_coordinates_cache(patents: pd.DataFrame) -> None:
         # Gotta make this messy because dataframes won't format tuples correctly
         existing_cities = set(df.apply(lambda row: (row['city'], row['country'], row['state']), axis=1))
 
-    log(f"Found {len(existing_cities)} cities already cached.", color=Fore.CYAN)
+    logger.info("Found {} cities already cached.".format(len(existing_cities)))
     st = time.time()
-    log(f"\nCreating cache of city coordinates...", color=Fore.LIGHTBLUE_EX, color_full=True)
+    logger.info("Creating cache of city coordinates...")
 
     # Create or update the cache of city coordinates
     failed_counter = 0
@@ -175,8 +172,8 @@ def create_city_coordinates_cache(patents: pd.DataFrame) -> None:
             f.flush()  # Ensure data is written to file immediately
 
     if failed_counter > 0:
-        log(f"Failed to find coordinates for {failed_counter} cities.", level="WARNING")
-    log(f"City coordinates cache created/updated at {local_filename(LOCATIONS_TSV_PATH)} in {(time.time() - st)/60:.2f} minutes.", color=Fore.GREEN)
+        logger.warning("Failed to find coordinates for {} cities.".format(failed_counter))
+    logger.info("City coordinates cache created/updated at {} in {:.2f} minutes.".format(local_filename(LOCATIONS_TSV_PATH), (time.time() - st) / 60))
 
     clean_coordinate_info()
 
@@ -186,7 +183,7 @@ def add_coordinates_to_corrections():
     location, and saves the updated file.
     """
     if not os.path.exists(CORRECTIONS_PATH):
-        log(f"Corrections file not found at {local_filename(CORRECTIONS_PATH)}", level="ERROR")
+        logger.error("Corrections file not found at {}. Exiting...".format(local_filename(CORRECTIONS_PATH)))
         return
 
     # Read the corrections file
@@ -194,10 +191,10 @@ def add_coordinates_to_corrections():
     total_rows = len(df)
     num_remaining = len(df[(df['latitude'] == 0.0) & (df['longitude'] == 0.0)])
     if num_remaining / total_rows < 0.25:
-        log(f"More than 75% of the locations have coordinates. Assuming all locations have been processed.", level="WARNING")
+        logger.warning("More than 75% of the locations have coordinates. Assuming all locations have been processed.")
         return
 
-    log(f"Processing coordinates for {total_rows} location corrections...")
+    logger.info("Processing coordinates for {} location corrections...".format(total_rows))
 
     # Add latitude and longitude columns if they don't exist
     if 'latitude' not in df.columns:
@@ -235,9 +232,9 @@ def add_coordinates_to_corrections():
     # Report results
     success_rate = (updates / total_rows) * 100
     failed = total_rows - updates
-    log(f"Added coordinates for {updates} locations ({success_rate:.1f}% success rate)")
+    logger.info("Added coordinates for {} locations ({:.1f}% success rate)".format(updates, success_rate))
     if failed > 0:
-        log(f"Failed to get coordinates for {failed} locations", level="WARNING")
+        logger.warning("Failed to get coordinates for {} locations".format(failed))
 
 def final_merge_and_clean(batch_size: int = 10000):
     """
@@ -252,13 +249,13 @@ def final_merge_and_clean(batch_size: int = 10000):
         batch_size (int): Number of rows to process at a time
     """
     start_time = time.time()
-    log(f"Starting final merge and clean process. Estimated completion time: {completion_time(205)}.\n", color=Fore.BLUE, color_full=True)
+    logger.info("Starting final merge and clean process. Estimated completion time: {}.".format(completion_time(205)))
 
     #######################################################################
     #     Step 1: Load corrections into memory as a lookup dictionary     #
     #######################################################################
 
-    log("Loading corrections into memory...")
+    logger.info("Loading corrections into memory...")
     corrections_df = pd.read_csv(CORRECTIONS_PATH, sep='\t')
 
     # Create lookup dictionary with lowercase, stripped keys
@@ -280,15 +277,15 @@ def final_merge_and_clean(batch_size: int = 10000):
     num_filtered = num_total_corrections - num_valid_corrections
     success_rate = (num_valid_corrections / num_total_corrections * 100) if num_total_corrections > 0 else 0
     
-    log(f"Loaded {num_valid_corrections} valid corrections out of {num_total_corrections} total")
+    logger.info("Loaded {} valid corrections out of {} total".format(num_valid_corrections, num_total_corrections))
     if num_filtered > 0:
-        log(f"Filtered out {num_filtered} corrections without valid coordinates ({success_rate:.1f}% success rate)", level="WARNING")
+        logger.warning("Filtered out {} corrections without valid coordinates ({:.1f}% success rate)".format(num_filtered, success_rate))
 
     #######################################################################
     #         Step 2: Update the coordinates file with corrections        #
     #######################################################################
 
-    log("Updating master coordinates file...")
+    logger.info("Updating master coordinates file...")
     coords_df = pd.read_csv(LOCATIONS_TSV_PATH, sep='\t')
 
     # Create set of existing locations to avoid duplicates
@@ -346,7 +343,7 @@ def final_merge_and_clean(batch_size: int = 10000):
         new_locations_df = pd.DataFrame(new_locations)
         coords_df = pd.concat([coords_df, new_locations_df], ignore_index=True)
         coords_df.to_csv(LOCATIONS_TSV_PATH, sep='\t', index=False)
-        log(f"Added {len(new_locations)} new locations to coordinates file")
+        logger.info("Added {} new locations to coordinates file".format(len(new_locations)))
     
     #######################################################################
     #       Step 3: Update patent location names with corrections         #
@@ -362,7 +359,7 @@ def final_merge_and_clean(batch_size: int = 10000):
     #   - If found, update the coordinate lookup key
     #   - Add the coordinates if they exist
 
-    log(f"Updating patent location names. Estimated completion time: {completion_time(70)}.", color=Fore.LIGHTMAGENTA_EX)
+    logger.info("Updating patent location names. Estimated completion time: {}.".format(completion_time(70)))
     p_names_start = time.time()
     location_updates = 0
     total_patents = 0
@@ -375,7 +372,6 @@ def final_merge_and_clean(batch_size: int = 10000):
     # Process patents file in chunks to update location names
     for chunk in pd.read_csv(PATENTS_PATH, sep='\t', chunksize=batch_size):
         total_patents += len(chunk)
-        chunk_modified = False
         
         for idx, row in chunk.iterrows():
             # Update inventor location name if correction exists
@@ -389,7 +385,7 @@ def final_merge_and_clean(batch_size: int = 10000):
                 chunk.at[idx, 'inventor_city'] = correction['city']
                 chunk.at[idx, 'inventor_state'] = correction['state']
                 chunk.at[idx, 'inventor_country'] = correction['country']
-                chunk_modified = True
+
                 location_updates += 1
             
             # Update assignee location name if correction exists and not null
@@ -404,18 +400,21 @@ def final_merge_and_clean(batch_size: int = 10000):
                     chunk.at[idx, 'assignee_city'] = correction['city']
                     chunk.at[idx, 'assignee_state'] = correction['state']
                     chunk.at[idx, 'assignee_country'] = correction['country']
-                    chunk_modified = True
+
                     location_updates += 1
         
         # Write chunk to interim file
         chunk.to_csv(INTERIM_PATENTS_PATH, sep='\t', index=False, mode='a', header=not os.path.exists(INTERIM_PATENTS_PATH))
 
-    log(f"Updated {location_updates} location names in {(time.time() - p_names_start)/60:.2f} minutes.")
+    logger.info("Updated {} location names in {:.2f} minutes.".format(location_updates, (time.time() - p_names_start) / 60))
+
 
     #######################################################################
     #       Step 4: Add coordinates to patents using lowercase lookup     #
     #######################################################################
-    log(f"Adding coordinates from master file. Estimated completion time: {completion_time(140)}.", color=Fore.LIGHTCYAN_EX)
+
+
+    logger.info("Adding coordinates from master file. Estimated completion time: {}.".format(completion_time(140)))
     coord_add_start = time.time()
     
     # Read and create lowercase coordinate lookup
@@ -482,12 +481,12 @@ def final_merge_and_clean(batch_size: int = 10000):
     location_rate = (location_updates / total_patents) * 100 if total_patents > 0 else 0
     coord_rate = (coordinate_updates / (total_patents * 2)) * 100 if total_patents > 0 else 0
 
-    log(f"Added coordinates to {coordinate_updates} inventor/assignee locations in {(time.time() - coord_add_start)/60:.2f} minutes.")
+    logger.info("Added coordinates to {} inventor/assignee locations in {:.2f} minutes.".format(coordinate_updates, (time.time() - coord_add_start) / 60))
     
-    log(f"\nFinal merge and clean completed in {runtime:.1f} seconds:", color=Fore.GREEN, color_full=True)
-    log(f"  > Processed {total_patents} patents", color=Fore.GREEN)
-    log(f"  > Updated {location_updates} location names ({location_rate:.1f}% update rate)", color=Fore.GREEN)
-    log(f"  > Added {coordinate_updates} coordinate pairs ({coord_rate:.1f}% success rate)", color=Fore.GREEN)
+    logger.info("Final merge and clean completed in {:.1f} seconds:".format(runtime))
+    logger.info("  > Processed {} patents".format(total_patents))
+    logger.info("  > Updated {} location names ({:.1f}% update rate)".format(location_updates, location_rate))
+    logger.info("  > Added {} coordinate pairs ({:.1f}% success rate)".format(coordinate_updates, coord_rate))
 
 def drop_unusable():
     """
@@ -496,7 +495,7 @@ def drop_unusable():
     """
     # Ensure the patents file exists
     if not os.path.exists(FINAL_PATENTS_PATH):
-        log(f"Patents file not found at {local_filename(FINAL_PATENTS_PATH)}. Try running from `main.py` and selection option (1).", level="ERROR")
+        logger.error("Patents file not found at {}. Try running from `main.py` and selection option (1).".format(local_filename(FINAL_PATENTS_PATH)))
         return
 
     # Read the patents file
@@ -506,8 +505,8 @@ def drop_unusable():
     num_remaining = len(patents)
     num_removed = num_patents - num_remaining
     patents.to_csv(FINAL_PATENTS_PATH, sep='\t', index=False)
-    log(f"Removed {num_removed} patents without a FIPS code for the inventor.", color=Fore.CYAN)
-    log(f"Lost {num_removed / num_patents * 100:.2f}% of patents due to missing FIPS codes.", color_full=True)
+    logger.info("Removed {} patents without a FIPS code for the inventor.".format(num_removed))
+    logger.info("Lost {:.2f}% of patents due to missing FIPS codes.".format(num_removed / num_patents * 100))
 
 def clean_coordinate_info():
     """
@@ -518,32 +517,24 @@ def clean_coordinate_info():
     # Ensure coords dir exists
     os.makedirs(os.path.dirname(LOCATIONS_TSV_PATH), exist_ok=True)
     if not os.path.exists(LOCATIONS_TSV_PATH):
-        log(f"City coordinates file not found at {local_filename(LOCATIONS_TSV_PATH)}.", level="ERROR")
+        logger.error("City coordinates file not found at {}. Exiting...".format(local_filename(LOCATIONS_TSV_PATH)))
         return
 
     # Read existing entries
     df = pd.read_csv(LOCATIONS_TSV_PATH, sep='\t')
     length_prior = len(df)
     df = df.drop_duplicates()
-    log(f"Removed {length_prior - len(df)} duplicate location entries.", color=Fore.CYAN)
+    logger.info("Removed {} duplicate location entries.".format(length_prior - len(df)))
 
     # Print how many have 0.0 for lat/lon
     failed = df[(df["latitude"] == 0.0) & (df["longitude"] == 0.0)]
-    log(f"Found {len(failed)} entries with 0.0 for latitude and longitude.", color=Fore.CYAN)
+    logger.info("Found {} entries with 0.0 for latitude and longitude.".format(len(failed)))
 
     # Save the failed entries to a new file
     failed_path = os.path.join(project_root, "data", "geolocation", "city_coordinates_failed.tsv")
     failed.to_csv(failed_path, sep='\t', index=False)
-    log(f"Failed city coordinates saved to {local_filename(failed_path)}", color=Fore.YELLOW)
+    logger.info(f"Failed city coordinates saved to {local_filename(failed_path)}")
 
     # Save the cleaned data
     df.to_csv(LOCATIONS_TSV_PATH, sep='\t', index=False)
-    log(f"Cleaned city coordinates saved to {local_filename(LOCATIONS_TSV_PATH)}", color=Fore.GREEN)
-
-
-#drop_unusable()
-#add_coordinates(pd.read_csv(os.path.join(project_root, 'data/processed_patents.tsv'), sep='\t'))
-#add_coordinates_to_corrections()
-#add_coordinates()
-#print(api_request_coordinates('000005mtrirpdyrtlkfbffj0e'))
-#print(api_request_coordinates('439af3dd-16c8-11ed-9b5f-1234bde3cd05'))
+    logger.info("Cleaned city coordinates saved to {}.".format(local_filename(LOCATIONS_TSV_PATH)))

@@ -17,7 +17,16 @@ sys.path.insert(0, str(project_root))
 import pandas as pd
 import time
 from tqdm import tqdm
-from src.other.helpers import log
+from src.other.logging import PatentLogger
+
+
+###############################################################################
+#                               CONFIGURATION                                 #
+###############################################################################
+
+
+# Initialize logger
+logger = PatentLogger.get_logger(__name__)
 
 # For access to data here, just do f"{DATA_FOLDER}/and then whatever file name you want"
 DATA_FOLDER = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
@@ -27,3 +36,10 @@ employment_p = os.path.join(DATA_FOLDER, 'raw', 'yearly_employment_county.csv')
 gdp_p        = os.path.join(DATA_FOLDER, 'raw', 'yearly_gdp_county.csv')
 income_p     = os.path.join(DATA_FOLDER, 'raw', 'yearly_personal_income_county.csv')
 more_info_p  = os.path.join(DATA_FOLDER, 'raw', 'yearly_more_county_info.csv')
+
+
+###############################################################################
+#                               DATA CLEANING                                 #
+###############################################################################
+
+

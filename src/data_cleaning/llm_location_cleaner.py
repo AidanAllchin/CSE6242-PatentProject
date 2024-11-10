@@ -33,7 +33,11 @@ from datetime import datetime
 from tqdm import tqdm
 import ollama
 from typing import List, Dict, Tuple, Optional
-from src.other.helpers import log, local_filename
+from src.other.logging import PatentLogger
+from src.other.helpers import local_filename
+
+# Initialize logger
+logger = PatentLogger.get_logger(__name__)
 
 # Constants
 BATCH_SIZE      = 10    # may need to lower this if accuracy is atrocious
@@ -148,7 +152,9 @@ class LocationCleaner:
         else: self.metrics = None
 
         enabled = "enabled" if diagnostics else "disabled"
-        log(f" \n  > Initialized LocationCleaner with input: {Style.DIM}{local_filename(input_tsv)}{Style.NORMAL} \n  > Output: {Style.DIM}{local_filename(output_tsv)}{Style.NORMAL} \n  > Metrics = {Fore.GREEN if diagnostics else Fore.RED}{enabled}{Fore.LIGHTBLUE_EX}", color_full=True, color=Fore.LIGHTBLUE_EX)
+        logger.info(f"Initialized LocationCleaner with input: {local_filename(input_tsv)}")
+        logger.info(f"Output: {local_filename(output_tsv)}")
+        logger.info(f"Metrics = {enabled}", color=Fore.LIGHTBLUE_EX)
 
     def load_model(self, model_name: str = PREFERRED_MODEL) -> bool:
         """
@@ -166,20 +172,21 @@ class LocationCleaner:
         all_ollama_models = ollama.list()
         all_ollama_models = [model['name'] for model in all_ollama_models['models']]
 
-        log(f"Available models: {Style.DIM}{all_ollama_models}{Style.NORMAL}")
+        logger.info(f"Available models: {all_ollama_models}")
 
         # Pull model if not already downloaded
         if model_name not in all_ollama_models:
-            log(f"Model not found: {Style.DIM}{model_name}{Style.NORMAL}. Attempting to pull it.", level="ERROR")
-            log(f"Depending on your download speed, this can take multiple minutes.", level="WARNING")
+            logger.error(f"Model not found: {model_name}. Attempting to pull it.")
+            logger.warning("Depending on your download speed, this can take multiple minutes.")
             try:
                 ollama.pull(model_name)
-                log(f"Model {Style.DIM}{model_name}{Style.NORMAL} pulled successfully.", color=Fore.LIGHTGREEN_EX)
+                logger.info(f"Model {model_name} pulled successfully.")
             except Exception as e:
-                log(f"Failed to pull model: {Style.DIM}{model_name}{Style.NORMAL}: {e}", level="ERROR")
+                logger.exception(f"Failed to pull model: {model_name}: {e}")
                 return False
 
-        log(f"Model {Style.DIM}{model_name}{Style.NORMAL} loaded successfully.\n")
+        logger.info(f"Model {model_name} loaded successfully.")
+
         is_loaded = True
         loaded_model = model_name
         return True
@@ -195,7 +202,9 @@ class LocationCleaner:
                 (row['new_city'], row['new_state'], row['new_country'])
                 for _, row in df.iterrows()
             }
-            log(f"Loaded {len(self.corrections)} existing entries from the output TSV.")
+            logger.info(f"Loaded {len(self.corrections)} existing entries from the output TSV.")
+        else:
+            logger.info(f"No existing corrections found in {local_filename(self.output_tsv)}.")
 
     def save_corrections(self):
         """
@@ -209,7 +218,7 @@ class LocationCleaner:
             for bad, new in self.corrections.items()
         ])
         df.to_csv(self.output_tsv, sep='\t', index=False)
-        log(f"Saved {len(self.corrections)} corrections to {local_filename(self.output_tsv)}.", color=Fore.LIGHTGREEN_EX)
+        logger.info(f"Saved {len(self.corrections)} corrections to {local_filename(self.output_tsv)}.")
 
     def create_system_prompt(self) -> str:
         """
@@ -304,9 +313,9 @@ Example response format:
         global is_loaded, loaded_model
 
         if not is_loaded or model_name != loaded_model:
-            log(f"Model {Style.DIM}{model_name}{Style.NORMAL} not loaded. Attempting to load it.", level="WARNING")
+            logger.warning(f"Model {model_name} not loaded. Attempting to load it.")
             if not self.load_model(model_name):
-                log(f"Failed to load model: {Style.DIM}{model_name}{Style.NORMAL}.", level="ERROR")
+                logger.error(f"Failed to load model: {model_name}.")
                 return None
 
         messages = [
@@ -337,7 +346,7 @@ Example response format:
                 corrections = corrections.strip()
                 corrections = json.loads(corrections)
                 if 'locations' not in corrections:
-                    log(f"Unexpected response format: {corrections}", level="ERROR")
+                    logger.error(f"Unexpected response format: {corrections}")
                     return {loc: loc for loc in locations}
                 corrections = corrections['locations']
 
@@ -367,7 +376,7 @@ Example response format:
                     for correction in corrections:
                         #log(f"Correction: {correction}")
                         if not isinstance(correction, dict):
-                            log(f"Skipping invalid correction format: {correction}", level="WARNING")
+                            logger.warning(f"Skipping invalid correction format: {correction}")
                             continue
                             
                         original  = correction.get('original')
@@ -379,27 +388,27 @@ Example response format:
                             isinstance(corrected, list) and len(corrected) == 3):
                             result[tuple(str(x).lower() for x in original)] = tuple(corrected)
                         else:
-                            log(f"Skipping invalid correction format: {correction}", level="WARNING")
+                            logger.warning(f"Skipping invalid correction format: {correction}")
                 
                 else:
-                    log(f"Unexpected response format: {corrections}", level="ERROR")
+                    logger.error(f"Unexpected response format: {corrections}")
 
                 # For locations not handled, store lowercase -> lowercase
                 for loc in locations:
                     # annoying but have to lowercase and the LLM saves as none instead of nan
                     loc_lower_nan  = tuple(str(x).lower().replace('none', 'nan') for x in loc)
                     loc_lower_none = tuple(str(x).lower().replace('nan', 'none') for x in loc)
-                    #log(f"Checking for {loc_lower} in corrections.")
+
                     if loc_lower_nan not in result and loc_lower_none not in result:
                         result[loc_lower_nan] = loc_lower_nan
 
                 return result
             except json.JSONDecodeError:
-                log(f"Failed to decode JSON response: {response['message']['content']}", level="ERROR")
+                logger.exception(f"Failed to decode JSON response: {response['message']['content']}")
                 return {loc: loc for loc in locations}
 
         except Exception as e:
-            log(f"Error in Ollama generation: {e}", level="ERROR")
+            logger.exception(f"Error in Ollama generation: {e}")
             return {loc: loc for loc in locations}
         
     async def process_locations(self):
@@ -426,7 +435,7 @@ Example response format:
             tuple(loc) for loc in failed_locations 
             if tuple(loc) not in self.corrections
         ]
-        log(f"Loaded {len(locations_to_process)} remaining unique locations to process in {time.time()-st:.2f}s.")
+        logger.info(f"Loaded {len(failed_locations)} unique locations with missing coordinates in {time.time()-st:.2f}s.")
         
         if self.metrics:
             self.metrics.total_locations = len(locations_to_process)
@@ -477,11 +486,12 @@ async def display_metrics_task(metrics: ProcessingMetrics):
         await asyncio.sleep(1)
 
 async def main():
-    log(f"\nStarting local-LLM location cleaner.", color=Fore.LIGHTBLUE_EX)
-    log(f"DO NOT RUN THIS ON A LAPTOP.", level="WARNING")
+    logger.info(f"\nStarting local-LLM location cleaner.")
+    logger.warning("DO NOT RUN THIS ON A LAPTOP.")
+
     i = input("Seriously - are you sure you want to continue? (y/n): ")
     if i.lower() != 'y':
-        log("Exiting.", level="ERROR")
+        logger.error("Exiting.")
         return
 
     cleaner = LocationCleaner(
@@ -498,7 +508,7 @@ async def main():
     try:
         await metrics_task
     except asyncio.CancelledError:
-        log("Metrics display task cancelled.", color=Fore.LIGHTYELLOW_EX)
+        logger.info("Metrics display task cancelled.")
 
 async def test():
     cleaner = LocationCleaner(

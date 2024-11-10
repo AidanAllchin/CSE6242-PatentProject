@@ -18,10 +18,24 @@ sys.path.insert(0, str(project_root))
 import pandas as pd
 import time
 from tqdm import tqdm
-from src.other.helpers import log
+from src.other.logging import PatentLogger
+
+
+###############################################################################
+#                               CONFIGURATION                                 #
+###############################################################################
+
+
+# Initialize logger
+logger = PatentLogger.get_logger(__name__)
 
 # For access to data here, just do f"{DATA_FOLDER}/and then whatever file name you want"
 DATA_FOLDER  = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'census')
 NAME_TO_FIPS = os.path.join(DATA_FOLDER, 'fips_to_county.tsv')
+
+
+###############################################################################
+#                               DATA CLEANING                                 #
+###############################################################################
 
 

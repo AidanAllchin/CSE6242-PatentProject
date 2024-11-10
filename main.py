@@ -27,7 +27,7 @@ import subprocess
 subprocess.run(['python3', '__init__.py'])
 
 from colorama import Fore, Style
-from src.other.helpers import log
+from src.other.logging import PatentLogger
 from src.data_cleaning.patent_cleanup import add_coordinates, drop_unusable
 from src.data_cleaning.patent_fips import add_fips_codes
 
@@ -36,6 +36,9 @@ from src.data_cleaning.patent_fips import add_fips_codes
 #                               CONFIGURATION                                 #
 ###############################################################################
 
+
+# Initialize logger
+logger = PatentLogger.get_logger(__name__)
 
 # Directories
 PATENTS_DIRECTORY    = os.path.join(project_root, 'data', 'patents')
@@ -52,8 +55,18 @@ CENSUS_DATA_PATH     = os.path.join(project_root, 'data', 'census', 'census_pred
 def get_patent_data():
     """
     This script should handle all patent data download and merging. The end 
-    result is `<root>/data/processed_patents.tsv`.
+    result is `<root>/data/patents.tsv`.
     """
+    if os.path.exists(CLEANED_PATENTS_PATH) and os.path.getsize(CLEANED_PATENTS_PATH) > 0:
+        logger.info("Patent data already exists. Skipping.")
+        return
+    else:
+        logger.warning("Please consider downloading the patent data and placing it in the appropriate directory.")
+        logger.warning("Running this script as an alternative will day upwards of 24 hours.")
+        i = input("Continue? (y/n): ")
+        if i.lower() != "y":
+            return
+
     try:
         subprocess.run(["python3", "src/data_cleaning/import_data.py"], check=True)
         print()
@@ -114,8 +127,10 @@ def display_menu():
     return input("Select an option: ")
 
 def main():
-    """Main function to run the patent processing pipeline."""
-    log("Starting patent processing pipeline...\n", color=Fore.CYAN, color_full=True)
+    """
+    Main function to run the patent processing pipeline.
+    """
+    logger.info("Starting patent processing pipeline...")
 
     while True:
         option = display_menu()
@@ -130,23 +145,23 @@ def main():
             get_census_data()
         elif option == "4":
             if not os.path.exists(CLEANED_PATENTS_PATH) or os.path.getsize(CLEANED_PATENTS_PATH) == 0:
-                log("\nCleaned patents file doesn't exists. Please run step 1 first.\n", level="ERROR")
+                logger.error("Cleaned patents file doesn't exists. Please run step 1 first.")
                 continue
             if not os.path.exists(BEA_DATA_PATH) or os.path.getsize(BEA_DATA_PATH) == 0:
-                log("\nBEA predictors file doesn't exists. Please run step 2 first.\n", level="ERROR")
+                logger.error("BEA predictors file doesn't exists. Please run step 2 first.")
                 continue
             if not os.path.exists(CENSUS_DATA_PATH) or os.path.getsize(CENSUS_DATA_PATH) == 0:
-                log("\nCensus predictors file doesn't exists. Please run step 3 first.\n", level="ERROR")
+                logger.error("Census predictors file doesn't exists. Please run step 3 first.")
                 continue
 
-            # If everything we need exists, run that shit
+            # If everything we need exists, run it
             create_model_predictors()
         elif option == "0":
             break
         else:
-            log("Invalid option. Please try again.", color=Fore.RED)
-
-    log("\nAll steps completed.", color=Fore.LIGHTCYAN_EX, color_full=True)
+            logger.error("Invalid option. Please try again.")
+    
+    logger.info("Exiting patent processing pipeline...")
 
 if __name__ == "__main__":
     main()
