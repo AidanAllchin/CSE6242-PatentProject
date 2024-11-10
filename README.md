@@ -39,6 +39,8 @@ python -m venv venv
 source venv/bin/activate  # On Windows, use venv\Scripts\activate
 ```
 
+OR use `conda`, `mamba`, or another environment manager. 
+
 3. Install required packages:
 
 ```
@@ -47,28 +49,30 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Requires downloading of `city_coordinates.tsv` and `location_corrections.tsv` from the SharePoint in the `data` folder.
+1. Requires downloading of `city_coordinates.tsv` and `location_corrections.tsv` from the SharePoint in the `data` folder. 
 
 - Pull the GitHub repo
 - Run `python main.py`
 - Before selecting a menu option, place these two files in the newly created `/data/geolocation` folder
-- Proceed with step 2
+- Proceed with step 2&3
 
-2. The script `python main.py` will walk through the steps to generate the `.tsv` files we'll be using for the remainder of the project. It's the only file that needs to be run. The menu items are designed to be run sequentially.
+2. To avoid having to run the patent cleaning pipeline yourselves, I've also uploaded the final `patents.tsv`. By downloading this file (also from the SharePoint) and placing it in `/data`, you can skip to menu item #2 in `main.py`.
+
+3. The script `python main.py` will walk through the steps to generate the `.tsv` files we'll be using for the remainder of the project. It's the only file that needs to be run. The menu items are designed to be run sequentially.
 
 This script will:
 
 - Install required packages if needed
 - Create necessary directories
 - Download all required tables
-- Merge all tables
-- Perform all data cleaning steps
-- Add latitude and longitude for inventor and assignee to each patent
-- WIP: Add inventor origination county information to every patent based on coordinates
-- Generate a `patents.tsv` file with all US-based patents since 2001 (this time constraint may no longer be necessary)
+- **Menu Item 1:** Merge all tables
+- **Menu Item 1:** Perform all data cleaning steps
+- **Menu Item 1:** Add latitude and longitude for inventor and assignee to each patent
+- **Menu Item 1:** Add inventor origination county information to every patent based on coordinates
+- **Menu Item 1:** Generate a `patents.tsv` file with all US-based patents since 2001 (this time constraint is due to GDP data being unavailable per-county prior to this)
 - WIP: Group patents and create model metrics organized by time window and county
-- WIP: Load census data
-- WIP: Load BEA data
+- **Menu Item 2:** WIP: Load BEA data
+- **Menu Item 3:** WIP: Load census data
 - WIP: Load Fed data
-- WIP: Create predictors and `innovation_score` for the Innovation Hub Predictor
+- **Menu Item 4:** WIP: Create predictors and `innovation_score` for the Innovation Hub Predictor
 - WIP: Use generated model to predict next period innovation score for any county
