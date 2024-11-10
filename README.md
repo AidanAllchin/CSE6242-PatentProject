@@ -20,6 +20,7 @@ Note that **manual downloading of these files is not required**. Multiple files 
 |  **BEA**   | `CAINC4__ALL_AREAS_1969_2022`  | https://apps.bea.gov/regional/zip/CAINC4.zip                                                |
 |  **BEA**   | `CAINC30__ALL_AREAS_1969_2022` | https://apps.bea.gov/regional/zip/CAINC30.zip                                               |
 | **Census** |     `fips_to_county_name`      | https://raw.githubusercontent.com/ChuckConnell/articles/refs/heads/master/fips2county.tsv   |
+| **Census** |  `county_boundaries.geojson`   | https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/us-county-boundaries/exports/geojson?lang=en&timezone=America%2FNew_York |
 
 ## Installation and Setup
 
@@ -70,9 +71,9 @@ This script will:
 - **Menu Item 1:** Add latitude and longitude for inventor and assignee to each patent
 - **Menu Item 1:** Add inventor origination county information to every patent based on coordinates
 - **Menu Item 1:** Generate a `patents.tsv` file with all US-based patents since 2001 (this time constraint is due to GDP data being unavailable per-county prior to this)
-- WIP: Group patents and create model metrics organized by time window and county
 - **Menu Item 2:** WIP: Load BEA data
 - **Menu Item 3:** WIP: Load census data
-- WIP: Load Fed data
-- **Menu Item 4:** WIP: Create predictors and `innovation_score` for the Innovation Hub Predictor
+- **Menu Item 4:** WIP: Load Fed data
+- **Menu Item 5:** WIP: Group patents and create model metrics organized by time window and county
+- **Menu Item 5:** WIP: Create predictors and `innovation_score` for the Innovation Hub Predictor
 - WIP: Use generated model to predict next period innovation score for any county
