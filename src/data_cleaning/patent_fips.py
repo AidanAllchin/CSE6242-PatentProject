@@ -22,7 +22,9 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict, Optional, List
+import multiprocessing as mp
+from multiprocessing import Pool
 import requests
 import time
 from rtree import index
@@ -191,68 +193,110 @@ def initialize_spatial_index(geojson_path: str) -> Tuple[index.Index, list]:
     
     return idx, county_polygons
 
-def get_county_info_from_coords(lat: float, lon: float, rtree_idx: index.Index, county_polygons: list, cache: Dict = None) -> Optional[Tuple[str, str]]:
+
+###############################################################################
+#                                                                             #
+#                          MULTIPROCESSING BATCHES                            #
+#                                                                             #
+###############################################################################
+
+
+def process_batch(args: Tuple) -> List[Dict]:
     """
-    Get county name and FIPS code for given coordinates using local spatial index.
+    Process a batch of patent records in parallel. Trying this instead of the 
+    cached single-threaded version to see if it's faster.
     
     Args:
-        lat: Latitude
-        lon: Longitude
-        rtree_idx: R-tree spatial index
-        county_polygons: List of (properties, polygon) tuples
-        cache: Optional dictionary to cache results
+        args: Tuple containing (batch_df, rtree_idx, county_polygons)
         
     Returns:
-        Tuple of (county_name, fips_code) or None if not found
+        List of dictionaries containing county info for each patent
     """
-    if cache is None:
-        cache = {}
-        
-    # Round coordinates for cache key
-    coord_key = (round(lat, 4), round(lon, 4))
+    batch_df, polygons_data = args
+    results = []
     
-    # Check cache first
-    if coord_key in cache:
-        return cache[coord_key]
+    # Recreate R-tree index for each process
+    idx = index.Index()
+    for pos, (props, geom) in enumerate(polygons_data):
+        idx.insert(pos, geom.bounds)
     
-    point = Point(lon, lat)
-    
-    # Query R-tree for candidate polygons
-    candidate_idxs = list(rtree_idx.intersection((lon, lat, lon, lat)))
-    
-    for idx_candidate in candidate_idxs:
-        props, polygon = county_polygons[idx_candidate]
-        if polygon.contains(point):
-            # Extract county name and FIPS from properties
-            county_name = props.get("name", "")
-            state_fips  = props.get("statefp", "")
-            county_fips = props.get("countyfp", "")
-            
-            # Ensure FIPS codes are padded correctly
-            state_fips  = state_fips.zfill(2)
-            county_fips = county_fips.zfill(3)
-            full_fips   = f"{state_fips}{county_fips}"
-            
-            # Cache the result
-            cache[coord_key] = (county_name, full_fips)
-            return county_name, full_fips
-            
-    return None
+    # Process each patent in the batch
+    for _, row in batch_df.iterrows():
+        result = {
+            'index': row.name,
+            'inventor_county': '',
+            'inventor_fips': '',
+            'assignee_county': '',
+            'assignee_fips': ''
+        }
 
-def add_county_info_to_patents(df: pd.DataFrame, rtree_idx: index.Index, county_polygons: list, batch_size: int = 1000) -> pd.DataFrame:
+        # Process inventor location
+        if (row['inventor_latitude'] != 0.0 and row['inventor_longitude'] != 0.0 and 
+            str(row['inventor_latitude']) != "nan" and str(row['inventor_longitude']) != "nan"):
+            point = Point(row['inventor_longitude'], row['inventor_latitude'])
+            
+            # Query R-tree
+            for idx_candidate in idx.intersection((point.x, point.y, point.x, point.y)):
+                props, polygon = polygons_data[idx_candidate]
+                if polygon.contains(point):
+                    # Extract county name and FIPS from properties
+                    county_name = props.get("name", "")
+                    state_fips  = props.get("statefp", "")
+                    county_fips = props.get("countyfp", "")
+                    
+                    # Ensure FIPS codes are padded correctly
+                    state_fips  = state_fips.zfill(2)
+                    county_fips = county_fips.zfill(3)
+                    full_fips   = f"{state_fips}{county_fips}"
+
+                    result['inventor_county'] = county_name
+                    result['inventor_fips'] = full_fips
+                    break
+
+        # Process assignee location
+        if (row['assignee_latitude'] != 0.0 and row['assignee_longitude'] != 0.0 and 
+            str(row['assignee_latitude']) != "nan" and str(row['assignee_longitude']) != "nan"):
+            point = Point(row['assignee_longitude'], row['assignee_latitude'])
+            
+            # Query R-tree
+            for idx_candidate in idx.intersection((point.x, point.y, point.x, point.y)):
+                props, polygon = polygons_data[idx_candidate]
+                if polygon.contains(point):
+                    # Extract county name and FIPS from properties
+                    county_name = props.get("name", "")
+                    state_fips  = props.get("statefp", "")
+                    county_fips = props.get("countyfp", "")
+                    
+                    # Ensure FIPS codes are padded correctly
+                    state_fips  = state_fips.zfill(2)
+                    county_fips = county_fips.zfill(3)
+                    full_fips   = f"{state_fips}{county_fips}"
+
+                    result['assignee_county'] = county_name
+                    result['assignee_fips'] = full_fips
+                    break
+                    
+        results.append(result)
+    
+    return results
+
+def add_county_info_parallel(df: pd.DataFrame, rtree_idx: index.Index, county_polygons: list, batch_size: int = 1000, num_processes:int = None) -> pd.DataFrame:
     """
-    Add county name and FIPS code columns to patents dataframe.
-    Processes in batches to handle large datasets efficiently.
+    Add county name and FIPS code columns to patents dataframe using parallel processing.
     
     Args:
         df: Patents dataframe with latitude/longitude columns
         rtree_idx: R-tree spatial index
         county_polygons: List of (properties, polygon) tuples
         batch_size: Number of records to process per batch
+        num_processes: Number of processes to use (defaults to CPU count - 1)
         
     Returns:
         DataFrame with added county_name and fips_code columns
     """
+    if num_processes is None:
+        num_processes = max(1, mp.cpu_count() - 1)
+
     # Add new columns only if they don't exist
     for col in ['inventor_county', 'inventor_fips', 'assignee_county', 'assignee_fips']:
         if col not in df.columns:
@@ -263,57 +307,40 @@ def add_county_info_to_patents(df: pd.DataFrame, rtree_idx: index.Index, county_
             logger.info(f"Reset empty column: {col}")
         else:
             logger.warning(f"Column {col} already exists with data - skipping creation")
+
+    # Separate into batches
+    num_batches = len(df) // batch_size + (1 if len(df) % batch_size else 0)
+    logger.info(f"Processing patents in {num_batches} batches of {batch_size} records each...")
+    batches = []
+    for i in range(0, len(df), batch_size):
+        batch = df.iloc[i:i+batch_size].copy()
+        # Skip batch if all rows already have FIPS codes
+        if not batch[batch['inventor_fips'] == ''].empty:
+            batches.append((batch, county_polygons))
+
+    # Process batches in parallel
+    with Pool(processes=num_processes) as pool:
+        results = []
+        with tqdm(total=len(batches), desc=f"Processing patents using {num_processes} cores") as pbar:
+            for batch_results in pool.imap_unordered(process_batch, batches):
+                results.extend(batch_results)
+                pbar.update()
+
+    # Update dataframe with results
+    for result in results:
+        idx = result.pop('index')
+        for col, value in result.items():
+            df.at[idx, col] = value
     
-    # Cache for coordinate lookups
-    coord_cache = {}
-    
-    # Process in batches
-    logger.info(f"Processing patents in batches of {batch_size} records...")
-    logger.info("  > Note that the expected time shown below will decrease as the cache fills up.")
-    for i in tqdm(range(0, len(df), batch_size), desc="Adding county info", unit="batch", total=len(df)//batch_size):
-        batch = df.iloc[i:i+batch_size]
-        
-        for idx, row in batch.iterrows():
-            # Skip if the county info is already present
-            if row['inventor_fips'] != '':
-                continue
-
-            # Process inventor location if coordinates exist
-            elif row['inventor_latitude'] != 0.0 and row['inventor_longitude'] != 0.0 and str(row['inventor_latitude']) != "nan" and str(row['inventor_longitude']) != "nan":
-                #print(f"coords: {row['inventor_latitude']}, {row['inventor_longitude']}")
-                #print(f"types: {type(row['inventor_latitude'])}, {type(row['inventor_longitude'])}")
-
-                county_info = get_county_info_from_coords(
-                    row['inventor_latitude'],
-                    row['inventor_longitude'],
-                    rtree_idx,
-                    county_polygons,
-                    coord_cache
-                )
-                if county_info:
-                    df.at[idx, 'inventor_county'] = county_info[0]
-                    df.at[idx, 'inventor_fips']   = county_info[1]
-            
-            if row['assignee_fips'] != '':
-                continue
-
-            # Process assignee location if coordinates exist
-            elif row['assignee_latitude'] != 0.0 and row['assignee_longitude'] != 0.0 and str(row['assignee_latitude']) != "nan" and str(row['assignee_longitude']) != "nan":
-                county_info = get_county_info_from_coords(
-                    row['assignee_latitude'],
-                    row['assignee_longitude'],
-                    rtree_idx,
-                    county_polygons,
-                    coord_cache
-                )
-                if county_info:
-                    df.at[idx, 'assignee_county'] = county_info[0]
-                    df.at[idx, 'assignee_fips']   = county_info[1]
-                    
-        # Save after each batch
-        df.to_csv(FINAL_PATENTS_PATH, sep='\t', index=False)
-        
     return df
+
+
+###############################################################################
+#                                                                             #
+#                                    MAIN                                     #
+#                                                                             #
+###############################################################################
+
 
 def add_fips_codes():
     """
@@ -333,7 +360,8 @@ def add_fips_codes():
     
     # Add county information
     logger.info("Adding county information to patents...")
-    df = add_county_info_to_patents(df, rtree_idx, county_polygons)
+    #df = add_county_info_single(df, rtree_idx, county_polygons)
+    df = add_county_info_parallel(df, rtree_idx, county_polygons, batch_size=500)
     
     # Save final results
     logger.info("\nSaving updated patents file...")
