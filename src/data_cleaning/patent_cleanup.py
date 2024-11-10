@@ -4,8 +4,10 @@
 Created: Tue Oct 17 2024
 Author: Aidan Allchin
 
-Cleans the patent data by replacing/updating fields with patent-specific
-terminology to be more readable and consistent.
+Cleans the patent data by adding coordinates to each patent. This is done by
+iterating over each unique city/state/country pair in the patent data and
+collecting the latitude and longitude of each city. This data is then saved
+to a TSV file for future use.
 """
 import os, sys
 from pathlib import Path
@@ -17,13 +19,10 @@ sys.path.insert(0, str(project_root))
 
 from colorama import Fore, Style
 import subprocess
-from typing import List, Tuple, Set
 import pandas as pd
 import json
 import time
-import requests
 from tqdm import tqdm
-from src.objects.patent import Patent
 from src.other.helpers import log, get_coordinates_for_city, local_filename, completion_time
 
 
@@ -31,14 +30,15 @@ from src.other.helpers import log, get_coordinates_for_city, local_filename, com
 #                                   SETUP                                     #
 ###############################################################################
 
+
 with open(os.path.join(project_root, "config", "config.json"), "r") as f:
     config = json.load(f)
 
-LOCATIONS_TSV_PATH = os.path.join(project_root, config["settings"]["city_coordinates_path"])
+USPTO_API_KEY      = config["uspto_key"]
+LOCATIONS_TSV_PATH = os.path.join(project_root, 'data', 'geolocation', 'city_coordinates.tsv')
 CORRECTIONS_PATH   = os.path.join(project_root, 'data', 'geolocation', 'location_corrections.tsv')
 PATENTS_PATH       = os.path.join(project_root, 'data', 'processed_patents.tsv')
 FINAL_PATENTS_PATH = os.path.join(project_root, 'data', 'patents.tsv')
-USPTO_API_KEY      = config["uspto_key"]
 
 
 ###############################################################################
@@ -489,6 +489,26 @@ def final_merge_and_clean(batch_size: int = 10000):
     log(f"  > Updated {location_updates} location names ({location_rate:.1f}% update rate)", color=Fore.GREEN)
     log(f"  > Added {coordinate_updates} coordinate pairs ({coord_rate:.1f}% success rate)", color=Fore.GREEN)
 
+def drop_unusable():
+    """
+    Very simple final step dropping the patents without a FIPS code for the 
+    inventor. This is only 126 patents, but I want the final .tsv super clean.
+    """
+    # Ensure the patents file exists
+    if not os.path.exists(FINAL_PATENTS_PATH):
+        log(f"Patents file not found at {local_filename(FINAL_PATENTS_PATH)}. Try running from `main.py` and selection option (1).", level="ERROR")
+        return
+
+    # Read the patents file
+    patents = pd.read_csv(FINAL_PATENTS_PATH, sep='\t')
+    num_patents = len(patents)
+    patents = patents[patents['inventor_fips'].notnull()]
+    num_remaining = len(patents)
+    num_removed = num_patents - num_remaining
+    patents.to_csv(FINAL_PATENTS_PATH, sep='\t', index=False)
+    log(f"Removed {num_removed} patents without a FIPS code for the inventor.", color=Fore.CYAN)
+    log(f"Lost {num_removed / num_patents * 100:.2f}% of patents due to missing FIPS codes.", color_full=True)
+
 def clean_coordinate_info():
     """
     Clean the coordinate tsv file. This should only be called after the cache
@@ -521,7 +541,7 @@ def clean_coordinate_info():
     log(f"Cleaned city coordinates saved to {local_filename(LOCATIONS_TSV_PATH)}", color=Fore.GREEN)
 
 
-
+#drop_unusable()
 #add_coordinates(pd.read_csv(os.path.join(project_root, 'data/processed_patents.tsv'), sep='\t'))
 #add_coordinates_to_corrections()
 #add_coordinates()

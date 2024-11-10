@@ -28,7 +28,7 @@ subprocess.run(['python3', '__init__.py'])
 
 from colorama import Fore, Style
 from src.other.helpers import log
-from src.data_cleaning.patent_cleanup import add_coordinates
+from src.data_cleaning.patent_cleanup import add_coordinates, drop_unusable
 from src.data_cleaning.patent_fips import add_fips_codes
 
 
@@ -42,9 +42,6 @@ PATENTS_DIRECTORY    = os.path.join(project_root, 'data', 'patents')
 CLEANED_PATENTS_PATH = os.path.join(project_root, 'data', 'patents.tsv')
 BEA_DATA_PATH        = os.path.join(project_root, 'data', 'bea', 'bea_predictors.tsv')
 CENSUS_DATA_PATH     = os.path.join(project_root, 'data', 'census', 'census_predictors.tsv')
-CONFIG_PATH = os.path.join(project_root, 'config', 'config.json')
-with open(CONFIG_PATH, 'r') as f:
-    config = json.load(f)
 
 
 ###############################################################################
@@ -66,7 +63,7 @@ def get_patent_data():
     # Let em do what it does
     add_coordinates()
     add_fips_codes()
-
+    drop_unusable()
 
 def get_bea_data():
     """

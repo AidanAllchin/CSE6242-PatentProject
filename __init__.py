@@ -66,13 +66,10 @@ def ensure_directory_exists(dir: str):
 # Create directories
 if not os.path.exists("data"):
     ensure_directory_exists("data")
-    ensure_directory_exists("data/patents")
     ensure_directory_exists("data/geolocation")
     ensure_directory_exists("data/census")
     ensure_directory_exists("data/bea")
     ensure_directory_exists("data/raw")
-if not os.path.exists("data/patents"):
-    ensure_directory_exists("data/patents")
 if not os.path.exists("data/geolocation"):
     ensure_directory_exists("data/geolocation")
 if not os.path.exists("data/census"):
@@ -84,21 +81,7 @@ if not os.path.exists("data/raw"):
 if not os.path.exists("config"):
     ensure_directory_exists("config")
 
-CONFIG_PATH   = "config/config.json"
 RAW_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "raw")
-
-if not os.path.exists(CONFIG_PATH):
-    print(f"{Fore.YELLOW}[__init__.py]: {Style.NORMAL}Creating config file...{Style.RESET_ALL}")
-    with open(CONFIG_PATH, "w") as f:
-        json.dump({"settings": {
-        "desired_data_release": "2024-09-26", # We can modify this to get data from different releases
-        "data_link": "https://bulkdata.uspto.gov/data/patent/application/redbook/fulltext/",
-        "database_path": "data/patents.db",
-        "city_coordinates_path": "data/geolocation/city_coordinates.tsv"
-    }}, f)
-
-with open(CONFIG_PATH, "r") as f:
-    config = json.load(f)
 
 def os_specific_download(url: str, dest: str):
     sys_type = sys.platform
@@ -135,60 +118,6 @@ def os_specific_unzip(file: str, dest: str):
         print(f"{Fore.RED}[__init__.py]: {Style.NORMAL}Unsupported operating system: {sys_type}{Style.RESET_ALL}")
         print(f"{Fore.RED}[__init__.py]: {Style.NORMAL}Please download the data manually from the USPTO website: {file}{Style.RESET_ALL}")
         sys.exit(1)
-
-@DeprecationWarning
-def download_old():
-    desired_data_release = config["settings"]["desired_data_release"]
-    base_link            = config["settings"]["data_link"]
-
-    # Structure the 'YYYY-MM-DD' date format to YYMMDD
-    desired_data_release = desired_data_release.split("-")
-    release_year         = desired_data_release[0]
-    assert len(release_year) == 4, "Year must be in 'YYYY' format."
-    desired_data_release = desired_data_release[0][2:] + desired_data_release[1] + desired_data_release[2]
-
-    # Download the data from the USPTO website
-    dir_contents = os.listdir("data")
-    re_match = re.compile(r"ipa\d{6}\.xml")
-
-    all_data_files = [f for f in dir_contents if re_match.match(f)]
-    contains_desired = any(desired_data_release in f for f in all_data_files)
-    print(f"{Style.BRIGHT}{Fore.CYAN}[__init__.py]: {Style.NORMAL}Found {len(all_data_files)} data files in data directory.{Style.RESET_ALL}")
-    print(f"{Style.BRIGHT}{Fore.LIGHTCYAN_EX}[__init__.py]: {Style.RESET_ALL}Desired data release: {desired_data_release}.")
-    name = f"ipa{desired_data_release}.zip"
-
-    if not contains_desired:
-        print(f"{Fore.YELLOW}[__init__.py]: {Style.NORMAL}Data file not found in data directory.{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}{Style.BRIGHT}[__init__.py]: {Style.NORMAL}Downloading data from USPTO website...\n{Style.RESET_ALL}")
-        link = f"{base_link}{release_year}/{name}"
-        
-        sys_type = sys.platform
-        if sys_type == "linux":
-            subprocess.run(["wget", link, "-O", f"data/{name}"])
-            print(f"\n{Style.BRIGHT}{Fore.LIGHTCYAN_EX}[__init__.py]: {Style.DIM}Downloaded data file: data/{name}. Extracting...{Style.RESET_ALL}\n")
-            subprocess.run(["unzip", f"data/{name}", "-d", "data"])
-            subprocess.run(["rm", f"data/{name}"])
-        elif sys_type == "win32":
-            subprocess.run(["curl", link, "-o", f"data/{name}"])
-            print(f"\n{Style.BRIGHT}{Fore.LIGHTCYAN_EX}[__init__.py]: {Style.DIM}Downloaded data file: data/{name}. Extracting...{Style.RESET_ALL}\n")
-            subprocess.run(["tar", "-xf", f"data/{name}", "-C", "data"])
-            subprocess.run(["del", f"data/{name}"], shell=True)
-        # mac doesn't have wget
-        elif sys_type == "darwin":
-            subprocess.run(["curl", link, "-o", f"data/{name}"])
-            print(f"\n{Style.BRIGHT}{Fore.LIGHTCYAN_EX}[__init__.py]: {Style.DIM}Downloaded data file: data/{name}. Extracting...{Style.RESET_ALL}\n")
-            subprocess.run(["unzip", f"data/{name}", "-d", "data"])
-            subprocess.run(["rm", f"data/{name}"])
-        else:
-            print(f"{Fore.RED}[__init__.py]: {Style.NORMAL}Unsupported operating system: {sys_type}{Style.RESET_ALL}")
-            print(f"{Fore.RED}[__init__.py]: {Style.NORMAL}Please download the data manually from the USPTO website: {link}{Style.RESET_ALL}")
-            sys.exit(1)
-
-        print(f"\n{Style.BRIGHT}{Fore.LIGHTCYAN_EX}[__init__.py]: {Style.DIM}Extracted data file: data/{name.replace('.zip', '.xml')}{Style.RESET_ALL}")
-    else:
-        print(f"{Fore.GREEN}[__init__.py]: Data file already exists: data/{name.replace('.zip', '.xml')}{Style.RESET_ALL}")
-
-# download_old()
 
 def fetch_patent_raw_data():
     # Downloads the raw tables from USPTO required to run the notebook Reid made
