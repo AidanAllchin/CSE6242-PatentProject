@@ -66,7 +66,7 @@ if not os.path.exists("data"):
     ensure_directory_exists("data/census")
     ensure_directory_exists("data/bea")
     ensure_directory_exists("data/raw")
-    ensure_directory_exists("data/fed")
+    ensure_directory_exists("data/model")
 if not os.path.exists("data/geolocation"):
     ensure_directory_exists("data/geolocation")
 if not os.path.exists("data/census"):
@@ -75,8 +75,8 @@ if not os.path.exists("data/bea"):
     ensure_directory_exists("data/bea")
 if not os.path.exists("data/raw"):
     ensure_directory_exists("data/raw")
-if not os.path.exists("data/fed"):
-    ensure_directory_exists("data/fed")
+if not os.path.exists("data/model"):
+    ensure_directory_exists("data/model")
 if not os.path.exists("config"):
     ensure_directory_exists("config")
 

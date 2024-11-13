@@ -15,7 +15,7 @@ project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 import pandas as pd
-import time
+import numpy as np
 from tqdm import tqdm
 from typing import Dict
 from src.other.logging import PatentLogger
@@ -230,6 +230,46 @@ def get_more_info_df() -> Dict[int, pd.DataFrame]:
     # Return the list of dataframes
     return dfs
 
+def scale_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Scales a specified column in a DataFrame using robust scaling methods while handling NAs intelligently.
+
+    The function performs the following steps:
+    1. Converts '(NA)' strings to numpy NaN values.
+    2. Converts the column to float type, preserving NaN values.
+    3. Applies a log transformation to columns representing counts or populations.
+    4. Uses robust scaling for financial metrics.
+    5. Scales only the non-NA values in the column.
+    
+    Args:
+        df (pd.DataFrame): The input DataFrame containing the data.
+        column (str): The name of the column to be scaled.
+
+    Returns:
+        pd.DataFrame: The DataFrame with the specified column scaled.
+        
+    """
+    # Convert (NA) strings to numpy NaN
+    df[column] = df[column].replace('(NA)', np.nan)
+    
+    # Convert to float (this will preserve NaN values)
+    df[column] = df[column].astype(float)
+    
+    # For columns representing counts/populations, use log transformation
+    if any(x in column for x in ['count', 'population']):
+        # Add small constant to handle zeros
+        df[column] = np.log1p(df[column])
+    
+    # For financial metrics, use robust scaling
+    from sklearn.preprocessing import RobustScaler
+    scaler = RobustScaler()
+    
+    # Only scale non-NA values
+    mask = df[column].notna()
+    df.loc[mask, column] = scaler.fit_transform(df.loc[mask, column].values.reshape(-1, 1))
+    
+    return df
+
 def collect_bea_predictors():
     dest_path = os.path.join(DATA_FOLDER, 'bea')
     if not os.path.exists(dest_path):
@@ -239,6 +279,12 @@ def collect_bea_predictors():
     gdp_dfs        = gather_gdp_df()
     more_info_dfs  = get_more_info_df()
 
+    # Scale each column appropriately
+    columns_to_scale = ['average_earnings_per_job_dollars', 'real_gdp_thousands',
+                'current_gdp_thousands', 'residence_net_earnings_thousands',
+                'per_capita_income_dollars', 'personal_income_thousands',
+                'total_employment_count', 'population_count']
+
     # Merge all the dataframes together
     dfs = []
     logger.info("Merging dataframes together")
@@ -246,6 +292,13 @@ def collect_bea_predictors():
         df = employment_dfs[year]
         df = df.merge(gdp_dfs[year], on='GeoFIPS', how='left')
         df = df.merge(more_info_dfs[year], on='GeoFIPS', how='left')
+
+        # Remove state-level aggregates for county analysis
+        df = df[~df['GeoFIPS'].str.strip("\"").str.endswith('000')]
+
+        for column in columns_to_scale:
+            df = scale_column(df, column)
+
         dfs.append(df)
 
     # Save each year's data to a file

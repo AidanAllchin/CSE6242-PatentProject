@@ -43,9 +43,9 @@ logger = PatentLogger.get_logger(__name__)
 # Directories
 PATENTS_DIRECTORY    = os.path.join(project_root, 'data', 'patents')
 CLEANED_PATENTS_PATH = os.path.join(project_root, 'data', 'patents.tsv')
-BEA_DATA_PATH        = os.path.join(project_root, 'data', 'bea', 'bea_predictors.tsv')
-CENSUS_DATA_PATH     = os.path.join(project_root, 'data', 'census', 'census_predictors.tsv')
-FED_DATA_PATH        = os.path.join(project_root, 'data', 'fed', 'fed_predictors.tsv')
+BEA_DATA_PATH        = os.path.join(project_root, 'data', 'bea')
+CENSUS_DATA_PATH     = os.path.join(project_root, 'data', 'census')
+FED_DATA_PATH        = os.path.join(project_root, 'data', 'fed')
 
 
 ###############################################################################
@@ -88,7 +88,7 @@ def get_bea_data():
     """
     try:
         # TODO: Waiting for Kaitlyn to finish
-        subprocess.run(["python3", "src/modeling_overlays/bea_data.py"], check=True)
+        subprocess.run(["python3", "src/data_cleaning/bea_data.py"], check=True)
         print()
     except subprocess.CalledProcessError as e:
         print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `bea_data.py`: {e}{Style.RESET_ALL}\n")
@@ -102,7 +102,7 @@ def get_census_data():
     """
     try:
         # TODO: Waiting for Kaitlyn to finish
-        subprocess.run(["python3", "src/modeling_overlays/census_data.py"], check=True)
+        subprocess.run(["python3", "src/data_cleaning/census_data.py"], check=True)
         print()
     except subprocess.CalledProcessError as e:
         print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `census_data.py`: {e}{Style.RESET_ALL}\n")
@@ -116,7 +116,7 @@ def get_fed_data():
     """
     try:
         # TODO: Waiting for Kaitlyn to finish
-        subprocess.run(["python3", "src/modeling_overlays/fed_data.py"], check=True)
+        subprocess.run(["python3", "src/data_cleaning/fed_data.py"], check=True)
         print()
     except subprocess.CalledProcessError as e:
         print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `fed_data.py`: {e}{Style.RESET_ALL}\n")
@@ -129,16 +129,21 @@ def create_model_predictors():
 
     Should result in a `<root>/data/to_train.tsv` file.
     """
-    pass
+    try:
+        subprocess.run(["python3", "src/modeling_overlays/generate_predictors.py"], check=True)
+        print()
+    except subprocess.CalledProcessError as e:
+        print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `generate_predictors.py`: {e}{Style.RESET_ALL}\n")
 
 def display_menu():
     """Display the main menu options."""
     print(f"{Style.BRIGHT}       Main Menu{Style.RESET_ALL}")
     print("1. ETL patent data")
     print("2. ETL BEA data")
-    print("3. ETL census data")
-    print("4. ETL Fed data")
+    print("3. [Unused] ETL census data")
+    print("4. [Unused] ETL Fed data")
     print("5. Generate Innovation Hub Predictor Model (IHPM) variables")
+    print("6. Train IHPM and generate county-level predictions")
     print("0. Exit\n")
     return input("Select an option: ")
 
@@ -158,22 +163,25 @@ def main():
         elif option == "2":
             get_bea_data()
         elif option == "3":
-            get_census_data()
+            print(f"{Style.BRIGHT}{Fore.RED}Warning: This isn't used.{Style.RESET_ALL}")
+            #get_census_data()
         elif option == "4":
-            get_fed_data()
+            print(f"{Style.BRIGHT}{Fore.RED}Warning: This isn't used.{Style.RESET_ALL}")
+            #get_fed_data()
         elif option == "5":
             if not os.path.exists(CLEANED_PATENTS_PATH) or os.path.getsize(CLEANED_PATENTS_PATH) == 0:
-                logger.error("Cleaned patents file doesn't exists. Please run step 1 first.")
+                logger.error("Cleaned patents file doesn't exists. Please run step 1 or download the file.")
                 continue
-            if not os.path.exists(BEA_DATA_PATH) or os.path.getsize(BEA_DATA_PATH) == 0:
+            num_files = len([f for f in os.listdir(BEA_DATA_PATH) if os.path.isfile(os.path.join(BEA_DATA_PATH, f))])
+            if not num_files or num_files == 0:
                 logger.error("BEA predictors file doesn't exists. Please run step 2 first.")
                 continue
-            if not os.path.exists(CENSUS_DATA_PATH) or os.path.getsize(CENSUS_DATA_PATH) == 0:
-                logger.error("Census predictors file doesn't exists. Please run step 3 first.")
-                continue
-            if not os.path.exists(FED_DATA_PATH) or os.path.getsize(FED_DATA_PATH) == 0:
-                logger.error("Fed predictors file doesn't exists. Please run step 4 first.")
-                continue
+            # if not os.path.exists(CENSUS_DATA_PATH) or os.path.getsize(CENSUS_DATA_PATH) == 0:
+            #     logger.error("Census predictors file doesn't exists. Please run step 3 first.")
+            #     continue
+            # if not os.path.exists(FED_DATA_PATH) or os.path.getsize(FED_DATA_PATH) == 0:
+            #     logger.error("Fed predictors file doesn't exists. Please run step 4 first.")
+            #     continue
 
             # If everything we need exists, run it
             create_model_predictors()
