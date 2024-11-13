@@ -87,12 +87,6 @@ def scale_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
     
     return df
 
-
-###############################################################################
-#                               PREDICTOR GEN                                 #
-###############################################################################
-
-
 def load_bea_features(year: int) -> pd.DataFrame:
     """
     Load BEA features for a given year.
@@ -112,6 +106,12 @@ def load_bea_features(year: int) -> pd.DataFrame:
     df = df.drop(columns=['GeoFIPS'])
     
     return df
+
+
+###############################################################################
+#                               PREDICTOR GEN                                 #
+###############################################################################
+
 
 def calculate_patent_features(patent_df: pd.DataFrame, period_start: datetime, period_end: datetime) -> pd.DataFrame:
     """
