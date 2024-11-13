@@ -250,64 +250,6 @@ def add_population_count(predictors: List[pd.DataFrame]) -> List[pd.DataFrame]:
 
     return predictors
 
-# def add_innovation_scores(predictors: List[pd.DataFrame]) -> List[pd.DataFrame]:
-#     """
-#     Adds innovation_score for each county for every year's DataFrame based on 
-#     a combination of BEA data factors.
-
-#     Args:
-#         predictors: List of DataFrames with the following columns:
-#             - county_fips
-#             - num_patents
-#             - num_inventors
-#             - num_assignees
-#             - unique_wipo_fields
-#             - diversity_score
-#             - exports_score
-
-#     Returns:
-#         List[DataFrame] with the following columns:
-#             - county_fips
-#             - num_patents
-#             - num_inventors
-#             - num_assignees
-#             - unique_wipo_fields
-#             - diversity_score
-#             - exports_score
-#             - innovation_score
-#     """
-#     st = time.time()
-#     for i, predictors_df in enumerate(predictors):
-#         bea_df = pd.read_csv(os.path.join(BEA_FOLDER, f'bea_predictors_{predictors_df["year"].iloc[0]}.tsv'), sep='\t')
-#         bea_df['county_fips'] = bea_df['GeoFIPS'].astype(str)
-#         bea_df = bea_df.drop(columns=['GeoFIPS'])
-#         bea_cols = bea_df.columns.tolist()
-#         bea_cols.remove('county_fips')
-
-#         # print(predictors_df.columns)
-        
-#         # Merge the BEA data with the predictors but only if the county is in both
-#         predictors_df = predictors_df.merge(bea_df, on='county_fips', how='inner')
-        
-#         # Calculate innovation score based on weighted BEA data matching on county FIPS
-#         # GeoFIPS	per_capita_income_dollars	population_count	employment_per_capita	earnings_per_capita	real_gdp_thousands	average_earnings_per_job_dollars
-#         predictors_df['innovation_score'] = (
-#             predictors_df['per_capita_income_dollars'] * 0.3 + 
-#             predictors_df['earnings_per_capita'] * 0.2 +
-#             predictors_df['employment_per_capita'] * 0.2 +
-#             predictors_df['real_gdp_thousands'] * 0.4 +
-#             predictors_df['average_earnings_per_job_dollars'] * 0.1
-#         )
-
-#         # Scaling innovation score to be between 0 and 1
-#         predictors_df['innovation_score'] = (predictors_df['innovation_score'] - predictors_df['innovation_score'].min()) / (predictors_df['innovation_score'].max() - predictors_df['innovation_score'].min())
-
-#         predictors_df = predictors_df.drop(columns=bea_cols)
-#         predictors[i] = predictors_df
-    
-#     logger.info(f"Added innovation scores in {time.time() - st:.2f}s")
-#     return predictors
-
 def calculate_innovation_score(df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate innovation score using scaled inputs.
@@ -511,14 +453,15 @@ def calculate_county_modifiers(yearly_predictors: List[pd.DataFrame]) -> pd.Seri
             county_metrics[county] = 1.0  # Neutral modifier for counties with insufficient data
             continue
             
-        # 1. Relative Performance (z-score based)
+        # 1. Relative Performance (z-score)
         county_mean = county_data['innovation_score'].mean()
         relative_performance = (county_mean - global_mean) / global_std
+
         # Convert to a 0.5-1.5 range
-        relative_performance = 1 + (relative_performance / 5)  # Divide by 5 to dampen extreme values
+        relative_performance = 1 + (relative_performance / 5)  # dampen extreme values
         relative_performance = np.clip(relative_performance, 0.5, 1.5)
         
-        # 2. Growth Rate (with better handling of edge cases)
+        # 2. Growth Rate
         growth_rates = county_data['innovation_score'].pct_change().dropna()
         if len(growth_rates) > 0:
             # Use median instead of mean for robustness
@@ -537,7 +480,7 @@ def calculate_county_modifiers(yearly_predictors: List[pd.DataFrame]) -> pd.Seri
             if mean_score > 0:
                 cv = std_score / mean_score
                 # Convert to stability score (inverse of CV, normalized)
-                stability = 1 / (1 + cv)  # Will give a value between 0 and 1
+                stability = 1 / (1 + cv)  # between 0 and 1
                 # Convert to 0.9-1.1 range
                 stability = 0.9 + (stability * 0.2)
             else:
@@ -580,7 +523,7 @@ def add_county_modifiers(training_data: pd.DataFrame, yearly_predictors: List[pd
     Add county modifiers to the training data.
     This is a measure of each county's historical innovation performance relative
     to the global average, accounting for growth and stability.
-    It essentially allows us to remove the county_fips column and use the modifier
+    It allows us to remove the county_fips column and use the modifier
     as a proxy for the county's inherent innovation potential.
     
     Args:
@@ -658,9 +601,7 @@ def prepare_training_data(yearly_predictors: List[pd.DataFrame]) -> pd.DataFrame
     
     return final_df
 
-
-
-def save_training_data(predictors: List[pd.DataFrame]) -> None:
+def save_training_data(predictors: List[pd.DataFrame]):
     """
     Process yearly predictor files into a single training dataset and save it.
     
