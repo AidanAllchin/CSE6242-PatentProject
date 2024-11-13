@@ -71,7 +71,7 @@ def gather_employment_df() -> Dict[int, pd.DataFrame]:
     df = df.drop(columns=['Region', 'TableName', 'LineCode', 'IndustryClassification', 'Unit'])
 
     # Drop description values we don't care about as predictors
-    keep_vals = ['Personal income (thousands of dollars) ', 'Per capita personal income (dollars) 4/', 'Total employment ', 'Population (persons) 3/', 'Equals: Net earnings by place of residence ']
+    keep_vals = ['Per capita personal income (dollars) 4/', 'Total employment ', 'Population (persons) 3/', 'Equals: Net earnings by place of residence ']
     prior_len = len(df)
     df = df[df['Description'].isin(keep_vals)]
     logger.info(f"Dropped {prior_len - len(df)} rows that were not in the keep_vals list of Descriptions")
@@ -94,12 +94,26 @@ def gather_employment_df() -> Dict[int, pd.DataFrame]:
 
         # Rename the columns to be more descriptive
         year_df = year_df.rename(columns={
-            'Personal income (thousands of dollars) ': 'personal_income_thousands',
+            #'Personal income (thousands of dollars) ': 'personal_income_thousands',
             'Per capita personal income (dollars) 4/': 'per_capita_income_dollars',
             'Total employment ': 'total_employment_count',
             'Population (persons) 3/': 'population_count',
             'Equals: Net earnings by place of residence ': 'residence_net_earnings_thousands'
         })
+
+        # Ensure correct types
+        year_df['per_capita_income_dollars'] = year_df['per_capita_income_dollars'].replace('(NA)', np.nan)
+        year_df['per_capita_income_dollars'] = year_df['per_capita_income_dollars'].astype(float)
+        year_df['total_employment_count'] = year_df['total_employment_count'].replace('(NA)', np.nan)
+        year_df['total_employment_count'] = year_df['total_employment_count'].astype(float)
+        year_df['population_count'] = year_df['population_count'].replace('(NA)', np.nan)
+        year_df['population_count'] = year_df['population_count'].astype(float)
+        year_df['residence_net_earnings_thousands'] = year_df['residence_net_earnings_thousands'].replace('(NA)', np.nan)
+        year_df['residence_net_earnings_thousands'] = year_df['residence_net_earnings_thousands'].astype(float)
+
+        year_df['employment_per_capita'] = year_df['total_employment_count'] / year_df['population_count']
+        year_df['earnings_per_capita'] = year_df['residence_net_earnings_thousands'] / year_df['population_count']
+        year_df = year_df.drop(columns=['total_employment_count', 'residence_net_earnings_thousands'])
 
         # Remove the index
         year_df = year_df.reset_index(drop=True)
@@ -135,7 +149,7 @@ def gather_gdp_df() -> Dict[int, pd.DataFrame]:
     df = df.drop(columns=['Region', 'TableName', 'LineCode', 'IndustryClassification', 'Unit'])
 
     # Drop description values we don't care about as predictors
-    keep_vals = ['Real GDP (thousands of chained 2017 dollars) ', 'Current-dollar GDP (thousands of current dollars) ']
+    keep_vals = ['Real GDP (thousands of chained 2017 dollars) ']  # Only one value in this dataset we want
     prior_len = len(df)
     df = df[df['Description'].isin(keep_vals)]
     logger.info(f"Dropped {prior_len - len(df)} rows that were not in the keep_vals list of Descriptions")
@@ -158,8 +172,7 @@ def gather_gdp_df() -> Dict[int, pd.DataFrame]:
 
         # Rename the columns to be more descriptive
         year_df = year_df.rename(columns={
-            'Real GDP (thousands of chained 2017 dollars) ': 'real_gdp_thousands',
-            'Current-dollar GDP (thousands of current dollars) ': 'current_gdp_thousands'
+            'Real GDP (thousands of chained 2017 dollars) ': 'real_gdp_thousands'
         })
 
         # Remove the index
@@ -230,45 +243,45 @@ def get_more_info_df() -> Dict[int, pd.DataFrame]:
     # Return the list of dataframes
     return dfs
 
-def scale_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
-    """
-    Scales a specified column in a DataFrame using robust scaling methods while handling NAs intelligently.
+# def scale_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+#     """
+#     Scales a specified column in a DataFrame using robust scaling methods while handling NAs intelligently.
 
-    The function performs the following steps:
-    1. Converts '(NA)' strings to numpy NaN values.
-    2. Converts the column to float type, preserving NaN values.
-    3. Applies a log transformation to columns representing counts or populations.
-    4. Uses robust scaling for financial metrics.
-    5. Scales only the non-NA values in the column.
+#     The function performs the following steps:
+#     1. Converts '(NA)' strings to numpy NaN values.
+#     2. Converts the column to float type, preserving NaN values.
+#     3. Applies a log transformation to columns representing counts or populations.
+#     4. Uses robust scaling for financial metrics.
+#     5. Scales only the non-NA values in the column.
     
-    Args:
-        df (pd.DataFrame): The input DataFrame containing the data.
-        column (str): The name of the column to be scaled.
+#     Args:
+#         df (pd.DataFrame): The input DataFrame containing the data.
+#         column (str): The name of the column to be scaled.
 
-    Returns:
-        pd.DataFrame: The DataFrame with the specified column scaled.
+#     Returns:
+#         pd.DataFrame: The DataFrame with the specified column scaled.
         
-    """
-    # Convert (NA) strings to numpy NaN
-    df[column] = df[column].replace('(NA)', np.nan)
+#     """
+#     # Convert (NA) strings to numpy NaN
+#     df[column] = df[column].replace('(NA)', np.nan)
     
-    # Convert to float (this will preserve NaN values)
-    df[column] = df[column].astype(float)
+#     # Convert to float (this will preserve NaN values)
+#     df[column] = df[column].astype(float)
     
-    # For columns representing counts/populations, use log transformation
-    if any(x in column for x in ['count', 'population']):
-        # Add small constant to handle zeros
-        df[column] = np.log1p(df[column])
+#     # For columns representing counts/populations, use log transformation
+#     if any(x in column for x in ['count', 'population']):
+#         # Add small constant to handle zeros
+#         df[column] = np.log1p(df[column])
     
-    # For financial metrics, use robust scaling
-    from sklearn.preprocessing import RobustScaler
-    scaler = RobustScaler()
+#     # For financial metrics, use robust scaling
+#     from sklearn.preprocessing import RobustScaler
+#     scaler = RobustScaler()
     
-    # Only scale non-NA values
-    mask = df[column].notna()
-    df.loc[mask, column] = scaler.fit_transform(df.loc[mask, column].values.reshape(-1, 1))
+#     # Only scale non-NA values
+#     mask = df[column].notna()
+#     df.loc[mask, column] = scaler.fit_transform(df.loc[mask, column].values.reshape(-1, 1))
     
-    return df
+#     return df
 
 def collect_bea_predictors():
     dest_path = os.path.join(DATA_FOLDER, 'bea')
@@ -280,10 +293,9 @@ def collect_bea_predictors():
     more_info_dfs  = get_more_info_df()
 
     # Scale each column appropriately
-    columns_to_scale = ['average_earnings_per_job_dollars', 'real_gdp_thousands',
-                'current_gdp_thousands', 'residence_net_earnings_thousands',
-                'per_capita_income_dollars', 'personal_income_thousands',
-                'total_employment_count', 'population_count']
+    # columns_to_scale = ['average_earnings_per_job_dollars', 'real_gdp_thousands',
+    #             'per_capita_income_dollars', 'employment_per_capita',
+    #             'earnings_per_capita', 'population_count']
 
     # Merge all the dataframes together
     dfs = []
@@ -296,8 +308,8 @@ def collect_bea_predictors():
         # Remove state-level aggregates for county analysis
         df = df[~df['GeoFIPS'].str.strip("\"").str.endswith('000')]
 
-        for column in columns_to_scale:
-            df = scale_column(df, column)
+        # for column in columns_to_scale:
+        #     df = scale_column(df, column)
 
         dfs.append(df)
 
