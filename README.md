@@ -71,9 +71,10 @@ This script will:
 - **Menu Item 1:** Add latitude and longitude for inventor and assignee to each patent
 - **Menu Item 1:** Add inventor origination county information to every patent based on coordinates
 - **Menu Item 1:** Generate a `patents.tsv` file with all US-based patents since 2001 (this time constraint is due to GDP data being unavailable per-county prior to this)
-- **Menu Item 2:** WIP: Load BEA data
-- **Menu Item 3:** WIP: Load census data
-- **Menu Item 4:** WIP: Load Fed data
-- **Menu Item 5:** WIP: Group patents and create model metrics organized by time window and county
-- **Menu Item 5:** WIP: Create predictors and `innovation_score` for the Innovation Hub Predictor
-- WIP: Use generated model to predict next period innovation score for any county
+- **Menu Item 2:** Load BEA data
+- **Menu Item 3:** (Unused) Load census data
+- **Menu Item 4:** (Unused) Load Fed data
+- **Menu Item 5:** Group patents and create model metrics organized by time window and county
+- **Menu Item 5:** Create predictors and `innovation_score` for the Innovation Hub Predictor
+- **Menu Item 6:** WIP: Train IHPM and predict next period innovation score for all counties for overlay
+- **Menu Item 6:** WIP: Add latitude and longitude for the predicted values back to the data for the overlay
