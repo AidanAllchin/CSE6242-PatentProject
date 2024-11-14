@@ -6,6 +6,10 @@ Author: Aidan Allchin
 
 Trains the model using the generated data in `generate_predictors.py`. The
 model is then saved to disk for later use.
+
+IF YOU RUN THIS ON MACOS AND GET AN ERROR ABOUT `lightgbm` NOT BEING ABLE TO
+LOAD, TRY RUNNING THIS COMMAND IN THE TERMINAL:
+`brew install libomp`
 """
 import os, sys
 from pathlib import Path
@@ -15,17 +19,20 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-import joblib
 import pandas as pd
 import numpy as np
-import time
-import lightgbm as lgb
-from sklearn.model_selection import TimeSeriesSplit
+try:
+    import lightgbm as lgb
+except OSError as e:
+    print(e)
+    print("Try running `brew install libomp` in the terminal if on MacOS. Then in your correct python environment run the following:")
+    print("pip uninstall lightgbm\npip install lightgbm --no-binary lightgbm")
+    print("If it's still not working, you might have one of the Apple Silicon Macs, and I have not found a way to get lightgbm to work on those yet.")
+    sys.exit(1)
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from typing import List, Dict, Tuple
-from datetime import datetime
 from src.other.logging import PatentLogger
 from src.other.helpers import local_filename
 
