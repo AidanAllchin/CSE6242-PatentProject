@@ -24,6 +24,7 @@ import pandas as pd
 import numpy as np
 import time
 from tqdm import tqdm
+import json
 from sklearn.preprocessing import RobustScaler
 from typing import List
 from datetime import datetime
@@ -104,6 +105,90 @@ def load_bea_features(year: int) -> pd.DataFrame:
     df = pd.read_csv(bea_path, sep='\t')
     df['county_fips'] = df['GeoFIPS'].astype(str)
     df = df.drop(columns=['GeoFIPS'])
+    
+    return df
+
+def load_county_metadata() -> pd.DataFrame:
+    """
+    Load county metadata from the GeoJSON file, using pre-calculated centroids.
+    Because why calculate what's already calculated...
+    
+    Returns:
+        DataFrame with columns:
+            - county_fips: Combined state + county FIPS code
+            - state_name: Full state name (not abbreviation)
+            - county_name: County name without the word "County"
+            - latitude: Pre-calculated centroid latitude
+            - longitude: Pre-calculated centroid longitude
+    """
+    county_meta = []
+    geojson_path = os.path.join(project_root, "data", "geolocation", "county_boundaries.geojson")
+    
+    with open(geojson_path, 'r') as f:
+        counties = json.load(f)
+        
+    for feature in counties['features']:
+        props = feature['properties']
+        
+        # Get the pre-calculated centroid
+        centroid = props['geo_point_2d']
+        
+        # Create FIPS from state + county FIPS
+        state_fips  = props['statefp'].zfill(2)
+        county_fips = props['countyfp'].zfill(3)
+        fips        = f"{state_fips}{county_fips}"
+        
+        # The name in the GeoJSON includes "County"
+        county_name = props['name'].replace(' County', '')
+        
+        county_meta.append({
+            'county_fips': fips,
+            'state_name': props['state_name'],
+            'county_name': county_name,
+            'latitude': centroid['lat'],
+            'longitude': centroid['lon']
+        })
+    
+    return pd.DataFrame(county_meta)
+
+def add_county_metadata(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add state name, county name, and centroid coordinates to the DataFrame.
+    Now with 100% less geometry calculations! (god I love this .geojson file)
+    
+    Args:
+        df: DataFrame with county_fips column
+        
+    Returns:
+        DataFrame with added columns:
+            - state_name
+            - county_name 
+            - latitude
+            - longitude
+    """
+    county_meta = load_county_metadata()
+    
+    # Merge with main DataFrame
+    df = df.merge(
+        county_meta,
+        on='county_fips',
+        how='left'
+    )
+    
+    # Fill any missing values (this shouldn't happen)
+    df['state_name']  = df['state_name'].fillna('Unknown')
+    df['county_name'] = df['county_name'].fillna('Unknown')
+    df['latitude']    = df['latitude'].fillna(0.0)
+    df['longitude']   = df['longitude'].fillna(0.0)
+    
+    # Log some stats about the merge
+    merge_stats = (
+        f"Added location data to {len(df)} rows\n"
+        f"Missing state names: {df['state_name'].isna().sum()}\n"
+        f"Missing county names: {df['county_name'].isna().sum()}\n"
+        f"Missing coordinates: {df['latitude'].isna().sum()}"
+    )
+    logger.info(merge_stats)
     
     return df
 
@@ -541,9 +626,15 @@ def add_county_modifiers(training_data: pd.DataFrame, yearly_predictors: List[pd
     
     # Fill any missing modifiers with 1 (neutral)
     training_data['county_modifier'] = training_data['county_modifier'].fillna(1.0)
+
+    # Save mapping for future reference
+    modifier_path = os.path.join(MODEL_FOLDER, 'county_modifiers.tsv')
+    modifiers.reset_index().rename(columns={'index': 'county_fips', 0: 'county_modifier'}).to_csv(
+        modifier_path, sep='\t', index=False
+    )
     
-    # Remove county_fips as it's no longer needed
-    training_data = training_data.drop(columns=['county_fips'])
+    # We actually do want this still
+    #training_data = training_data.drop(columns=['county_fips'])
     
     return training_data
 
@@ -580,15 +671,24 @@ def prepare_training_data(yearly_predictors: List[pd.DataFrame]) -> pd.DataFrame
             how='inner'
         )
         
-        # Drop current year's innovation score and year column
-        merged = merged.drop(columns=['innovation_score', 'year'])
+        # Drop current year's innovation score
+        merged = merged.drop(columns=['innovation_score'])
         
         training_data.append(merged)
+    
+    # We do, however, want to keep the 2022 year as well for prediction
+    last_year = yearly_predictors[-1].copy()
+    last_year['next_innovation_score'] = np.nan
+    last_year = last_year.drop(columns=['innovation_score'])
+    training_data.append(last_year)
     
     # Combine all years into one DataFrame
     final_df = pd.concat(training_data, ignore_index=True)
 
-    # Add county modifiers and remove county_fips
+    # Add county metadata
+    final_df = add_county_metadata(final_df)
+
+    # Add county modifiers
     final_df = add_county_modifiers(final_df, yearly_predictors)
 
     try:
@@ -597,7 +697,12 @@ def prepare_training_data(yearly_predictors: List[pd.DataFrame]) -> pd.DataFrame
     except KeyError:
         pass
     
-    #final_df = final_df.rename(columns={'next_innovation_score': 'innovation_score'})
+    # Ensure location columns are preserved
+    preserve_cols = ['county_fips', 'state_name', 'county_name', 'latitude', 'longitude']
+    other_cols    = [col for col in final_df.columns if col not in preserve_cols and col != 'next_innovation_score']
+    
+    # Reorder columns with location data first, then features, then target
+    final_df      = final_df[preserve_cols + other_cols + ['next_innovation_score']]
     
     return final_df
 

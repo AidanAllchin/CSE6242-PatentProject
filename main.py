@@ -45,7 +45,8 @@ PATENTS_DIRECTORY    = os.path.join(project_root, 'data', 'patents')
 CLEANED_PATENTS_PATH = os.path.join(project_root, 'data', 'patents.tsv')
 BEA_DATA_PATH        = os.path.join(project_root, 'data', 'bea')
 CENSUS_DATA_PATH     = os.path.join(project_root, 'data', 'census')
-FED_DATA_PATH        = os.path.join(project_root, 'data', 'fed')
+FRED_DATA_PATH       = os.path.join(project_root, 'data', 'fed')
+TRAIN_DATA_PATH      = os.path.join(project_root, 'data', 'model', 'training_data.tsv')
 
 
 ###############################################################################
@@ -135,6 +136,19 @@ def create_model_predictors():
     except subprocess.CalledProcessError as e:
         print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `generate_predictors.py`: {e}{Style.RESET_ALL}\n")
 
+def create_predictions():
+    """
+    Trains the Innovation Hub Predictor Model and generates county-level
+    predictions for all years, including 2022.
+
+    Should result in a `<root>/data/predictions.tsv` file.
+    """
+    try:
+        subprocess.run(["python3", "src/modeling_overlays/model.py"], check=True)
+        print()
+    except subprocess.CalledProcessError as e:
+        print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `model.py`: {e}{Style.RESET_ALL}\n")
+
 def display_menu():
     """Display the main menu options."""
     print(f"{Style.BRIGHT}       Main Menu{Style.RESET_ALL}")
@@ -185,6 +199,13 @@ def main():
 
             # If everything we need exists, run it
             create_model_predictors()
+        elif option == "6":
+            if not os.path.exists(TRAIN_DATA_PATH) or os.path.getsize(TRAIN_DATA_PATH) == 0:
+                logger.error("Training data file doesn't exists. Please run step 5 first.")
+                continue
+
+            # If everything we need exists, run it
+            create_predictions()
         elif option == "0":
             break
         else:

@@ -3,6 +3,8 @@ colorama==0.4.6
 flask==3.0.3
 fredapi==0.5.2
 geopy==2.4.1
+lightgbm==4.5.0
+matplotlib==3.9.2
 numpy==1.26.4
 ollama==0.3.3
 pandas==2.2.3
