@@ -26,6 +26,7 @@ THe following tables should be downloaded manually and placed in their respectiv
 You can generate the third file using the first two files, or can download all three and jump straight to generating the BEA features and training the model.
 
 | **Link** | **File Location** | **Size (MB)** | **Time to Generate (hr)** | **Requires LLM** |
+| :------- | :--------------- | :-----------: | :-----------------------: | :---------: |
 | https://drive.google.com/file/d/178rhI4UhdwRtPUNkZPrOhQRl5pVFtL1f/view?usp=drive_link | `CSE6242-PatentProject/data/geolocation/` | 1.4 | 6  | n |
 | https://drive.google.com/file/d/1NPTZyfcBFptAvhmcSngn_Fo8VhfT9Gi-/view?usp=drive_link | `CSE6242-PatentProject/data/geolocation/` | 0.8 | 10 | y |
 | https://drive.google.com/file/d/18AX7vQeApAuCK2KgTLUACeJf36D2Band/view?usp=drive_link | `CSE6242-PatentProject/data/` | 913.6 | 0.4 | n |
