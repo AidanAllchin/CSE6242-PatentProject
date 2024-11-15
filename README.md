@@ -1,22 +1,38 @@
 # CSE6242-PatentProject
 
+## Description
+
+This project implements an automated patent data processing and analysis pipeline, designed to identify emerging innovation hubs across the United States. A picture's worth a thousand words, so here's our data cleaning and processing pipeline:
+
+![Patent Data Processing Pipeline](images/model_flow_diagram.png)
+
+Patent Pulse is an automated pipeline capable of predicting emerging innovation hubs across the United States by analyzing patent data in conjunction with economic indicators. Starting with over 2.5 million USPTO patents filed within the United States since 2001 (a constraint necessitated by the BEA's method of calculating GDP), the pipeline cleans and enriches the data through a complex process involving geolocation correction using a 32B parameter LLM, coordinate mapping, and county-level FIPS code assignment using R-tree spatial indexing based on latitude and longitude. The cleaning process maps 99.39% of patents to their originating counties, providing a robust foundation for geographic analysis that extends well beyond the scope of this one project.
+
+The analytical core of the project is the Innovation Hub Predictor Model (IHPM), which combines patent metrics aggregated over counties (density, diversity, collaboration scores) and economic indicators from the Bureau of Economic Analysis (BEA). Making use of county-level metrics such as GDP, personal income per-capita, employment per-capita, population, and more, we generate an 'innovation score' for each county, each year. We then offset the innovation scores by one period, training a model on our patent data to predict upcoming innovation. Using [LightGBM](https://www.geeksforgeeks.org/lightgbm-light-gradient-boosting-machine/) with a DART boosting strategy, the model achieves an $R^2$ score of 0.802, demonstrating strong predictive power. Our key features include patent activity, technical diversity, regional collaboration, and per-county modifiers based on historical trends and country averages.
+
+The end result is a predictive overlay that identifies potential future innovation hubs across U.S. counties that we've mapped back to coordinates and visualized on a map using Tableau, along with a display of individual patents over time, and a comparison between our predicted `innovation_score`s and the true calculated values for years 2001 to 2022.
+
 ## Details
+
+The turquoise nodes with dashed borders in the diagram in the **Description** section represent the 'manual' downloadable files that aren't required for the pipeline but can save significant amounts of time.
+
+</details>
 
 ### Data Used (Automatic)
 
 Note that **manual downloading of these files is not required**. Multiple files require specific file locations and naming conventions, so `__init__.py` (and by extension, `main.py`) will download, rename, and move these files automatically to ensure consistency.
 
-|   Source   |           Table Name           | Link                                                                                        |
-| :--------: | :----------------------------: | :------------------------------------------------------------------------------------------ |
-| **USPTO**  |           `g_patent`           | https://s3.amazonaws.com/data.patentsview.org/download/g_patent.tsv.zip                     |
-| **USPTO**  | `g_inventor_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_inventor_not_disambiguated.tsv.zip |
-| **USPTO**  | `g_location_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_location_not_disambiguated.tsv.zip |
-| **USPTO**  | `g_assignee_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_assignee_not_disambiguated.tsv.zip |
-| **USPTO**  |      `g_wipo_technology`       | https://s3.amazonaws.com/data.patentsview.org/download/g_wipo_technology.tsv.zip            |
-|  **BEA**   | `CAINC1__ALL_AREAS_1969_2023`  | https://apps.bea.gov/regional/zip/CAINC1.zip                                                |
-|  **BEA**   | `CAGDP1__ALL_AREAS_2001_2022`  | https://apps.bea.gov/regional/zip/CAGDP1.zip                                                |
-|  **BEA**   | `CAINC4__ALL_AREAS_1969_2023`  | https://apps.bea.gov/regional/zip/CAINC4.zip                                                |
-|  **BEA**   | `CAINC30__ALL_AREAS_1969_2023` | https://apps.bea.gov/regional/zip/CAINC30.zip                                               |
+|   Source   |           Table Name           | Link                                                                                                                                       |
+| :--------: | :----------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| **USPTO**  |           `g_patent`           | https://s3.amazonaws.com/data.patentsview.org/download/g_patent.tsv.zip                                                                    |
+| **USPTO**  | `g_inventor_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_inventor_not_disambiguated.tsv.zip                                                |
+| **USPTO**  | `g_location_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_location_not_disambiguated.tsv.zip                                                |
+| **USPTO**  | `g_assignee_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_assignee_not_disambiguated.tsv.zip                                                |
+| **USPTO**  |      `g_wipo_technology`       | https://s3.amazonaws.com/data.patentsview.org/download/g_wipo_technology.tsv.zip                                                           |
+|  **BEA**   | `CAINC1__ALL_AREAS_1969_2023`  | https://apps.bea.gov/regional/zip/CAINC1.zip                                                                                               |
+|  **BEA**   | `CAGDP1__ALL_AREAS_2001_2022`  | https://apps.bea.gov/regional/zip/CAGDP1.zip                                                                                               |
+|  **BEA**   | `CAINC4__ALL_AREAS_1969_2023`  | https://apps.bea.gov/regional/zip/CAINC4.zip                                                                                               |
+|  **BEA**   | `CAINC30__ALL_AREAS_1969_2023` | https://apps.bea.gov/regional/zip/CAINC30.zip                                                                                              |
 | **Census** |  `county_boundaries.geojson`   | https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/us-county-boundaries/exports/geojson?lang=en&timezone=America%2FNew_York |
 
 ### Data Used (Manual)
@@ -25,12 +41,11 @@ THe following tables should be downloaded manually and placed in their respectiv
 
 You can generate the third file using the first two files, or can download all three and jump straight to generating the BEA features and training the model.
 
-| **Link** | **File Location** | **Size (MB)** | **Time to Generate (hr)** | **Requires LLM** |
-| :------- | :--------------- | :-----------: | :-----------------------: | :---------: |
-| https://drive.google.com/file/d/178rhI4UhdwRtPUNkZPrOhQRl5pVFtL1f/view?usp=drive_link | `CSE6242-PatentProject/data/geolocation/` | 1.4 | 6  | n |
-| https://drive.google.com/file/d/1NPTZyfcBFptAvhmcSngn_Fo8VhfT9Gi-/view?usp=drive_link | `CSE6242-PatentProject/data/geolocation/` | 0.8 | 10 | y |
-| https://drive.google.com/file/d/18AX7vQeApAuCK2KgTLUACeJf36D2Band/view?usp=drive_link | `CSE6242-PatentProject/data/` | 913.6 | 0.4 | n |
-
+| **Link**                                                                              | **File Location**                         | **Size (MB)** | **Time to Generate (hr)** | **Requires LLM** |
+| :------------------------------------------------------------------------------------ | :---------------------------------------- | :-----------: | :-----------------------: | :--------------: |
+| https://drive.google.com/file/d/178rhI4UhdwRtPUNkZPrOhQRl5pVFtL1f/view?usp=drive_link | `CSE6242-PatentProject/data/geolocation/` |      1.4      |             6             |        n         |
+| https://drive.google.com/file/d/1NPTZyfcBFptAvhmcSngn_Fo8VhfT9Gi-/view?usp=drive_link | `CSE6242-PatentProject/data/geolocation/` |      0.8      |            10             |        y         |
+| https://drive.google.com/file/d/18AX7vQeApAuCK2KgTLUACeJf36D2Band/view?usp=drive_link | `CSE6242-PatentProject/data/`             |     913.6     |            0.4            |        n         |
 
 ## Installation and Setup
 
@@ -50,7 +65,7 @@ python -m venv venv
 source venv/bin/activate  # On Windows, use venv\Scripts\activate
 ```
 
-OR use `conda`, `mamba`, or another environment manager. 
+OR use `conda`, `mamba`, or another environment manager.
 
 3. Install required packages:
 
@@ -60,16 +75,15 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Requires downloading of `city_coordinates.tsv` and `location_corrections.tsv` from the SharePoint in the `data` folder. 
+1. Switch to your new python environment and run:
 
-- Pull the GitHub repo
-- Run `python main.py`
-- Before selecting a menu option, place these two files in the newly created `/data/geolocation` folder
-- Proceed with step 2&3
+```
+python main.py
+```
 
-2. To avoid having to run the patent cleaning pipeline yourselves, I've also uploaded the final `patents.tsv`. By downloading this file (also from the SharePoint) and placing it in `/data`, you can skip to menu item #2 in `main.py`.
+2. **_Before selecting a menu option,_** if interested in downloading one of the intermediate files (`city_coordinates.tsv`, `location_corrections.tsv`, and `patents.tsv`) to save time, do so now and place them in the newly created appropriate directory.
 
-3. The script `python main.py` will walk through the steps to generate the `.tsv` files we'll be using for the remainder of the project. It's the only file that needs to be run. The menu items are designed to be run sequentially.
+3. The script `python main.py` will walk through the entire project. The menu items are designed to be run sequentially.
 
 This script will:
 
@@ -89,9 +103,8 @@ This script will:
 - **Menu Item 6:** Train IHPM and predict next period innovation score for all counties for overlay
 - **Menu Item 6:** Add latitude and longitude for the predicted values back to the data for the overlay
 
-
 ## Known Issues
 
-The BEA tables downloaded in `__init__.py` have updated since starting the project. I've fixed the links for 3 of the 4, but `CAGDP1__ALL_AREAS_2001_2022` contains the GDP information per-county (one of our most important metrics) and still hasn't been updated to include 2023 as of November 15th. If the unzipping step fails for that file, change the "2022" in line 188 to "2023".
+The BEA tables downloaded in `__init__.py` update once annually, and have done so since starting the project. This year, the BEA changed the schema within some of the files, changing the process for calculating `innovation_score`s significantly. This would be worth addressing, except `CAGDP1__ALL_AREAS_2001_2022` contains the GDP information per-county (one of our most important metrics) and unlike the other files (updated on November 14th), will next update on December 4th. This makes any changes to adopt the new version infeasible, as the data we're pulling will change after turning the project in.
 
-
+To circumvent this, I've uploaded the 2022 versions of the necessary files to Google Drive, and the script will download these older tables by default.
