@@ -10,7 +10,7 @@ Patent Pulse is an automated pipeline capable of predicting emerging innovation 
 
 The analytical core of the project is the Innovation Hub Predictor Model (IHPM), which combines patent metrics aggregated over counties (density, diversity, collaboration scores) and economic indicators from the Bureau of Economic Analysis (BEA). Making use of county-level metrics such as GDP, personal income per-capita, employment per-capita, population, and more, we generate an 'innovation score' for each county, each year. We then offset the innovation scores by one period, training a model on our patent data to predict upcoming innovation. Using [LightGBM](https://www.geeksforgeeks.org/lightgbm-light-gradient-boosting-machine/) with a DART boosting strategy, the model achieves an $R^2$ score of 0.802, demonstrating strong predictive power. Our key features include patent activity, technical diversity, regional collaboration, and per-county modifiers based on historical trends and country averages.
 
-The end result is a predictive overlay that identifies potential future innovation hubs across U.S. counties that we've mapped back to coordinates and visualized on a map using Tableau, along with a display of individual patents over time, and a comparison between our predicted `innovation_score`s and the true calculated values for years 2001 to 2022.
+The end result is a predictive overlay that identifies potential future innovation hubs across U.S. counties that we've mapped back to coordinates and visualized on a map using Tableau, along with a display of individual patents over time, and a comparison between our predicted `innovation_score` and the true calculated values for years 2001 to 2022.
 
 ## Details
 
@@ -29,10 +29,10 @@ Note that **manual downloading of these files is not required**. Multiple files 
 | **USPTO**  | `g_location_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_location_not_disambiguated.tsv.zip                                                |
 | **USPTO**  | `g_assignee_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_assignee_not_disambiguated.tsv.zip                                                |
 | **USPTO**  |      `g_wipo_technology`       | https://s3.amazonaws.com/data.patentsview.org/download/g_wipo_technology.tsv.zip                                                           |
-|  **BEA**   | `CAINC1__ALL_AREAS_1969_2023`  | https://apps.bea.gov/regional/zip/CAINC1.zip                                                                                               |
+|  **BEA**   | `CAINC1__ALL_AREAS_1969_2022`  | https://apps.bea.gov/regional/zip/CAINC1.zip                                                                                               |
 |  **BEA**   | `CAGDP1__ALL_AREAS_2001_2022`  | https://apps.bea.gov/regional/zip/CAGDP1.zip                                                                                               |
-|  **BEA**   | `CAINC4__ALL_AREAS_1969_2023`  | https://apps.bea.gov/regional/zip/CAINC4.zip                                                                                               |
-|  **BEA**   | `CAINC30__ALL_AREAS_1969_2023` | https://apps.bea.gov/regional/zip/CAINC30.zip                                                                                              |
+|  **BEA**   | `CAINC4__ALL_AREAS_1969_2022`  | https://apps.bea.gov/regional/zip/CAINC4.zip                                                                                               |
+|  **BEA**   | `CAINC30__ALL_AREAS_1969_2022` | https://apps.bea.gov/regional/zip/CAINC30.zip                                                                                              |
 | **Census** |  `county_boundaries.geojson`   | https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/us-county-boundaries/exports/geojson?lang=en&timezone=America%2FNew_York |
 
 ### Data Used (Manual)
@@ -105,6 +105,6 @@ This script will:
 
 ## Known Issues
 
-The BEA tables downloaded in `__init__.py` update once annually, and have done so since starting the project. This year, the BEA changed the schema within some of the files, changing the process for calculating `innovation_score`s significantly. This would be worth addressing, except `CAGDP1__ALL_AREAS_2001_2022` contains the GDP information per-county (one of our most important metrics) and unlike the other files (updated on November 14th), will next update on December 4th. This makes any changes to adopt the new version infeasible, as the data we're pulling will change after turning the project in.
+The BEA tables downloaded in `__init__.py` update once annually, and have done so since starting the project. This year, the BEA changed the schema within some of the files, changing the process for calculating `innovation_score` significantly. This would be worth addressing, except `CAGDP1__ALL_AREAS_2001_2022` contains the GDP information per-county (one of our most important metrics) and unlike the other files (updated on November 14th), will next update on December 4th. This makes any changes to adopt the new version infeasible, as the data we're pulling will change after turning the project in.
 
 To circumvent this, I've uploaded the 2022 versions of the necessary files to Google Drive, and the script will download these older tables by default.
