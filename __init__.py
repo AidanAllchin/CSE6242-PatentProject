@@ -9,8 +9,13 @@ download the data. It should be run before running any other scripts in the
 project. This is also the only file that uses relative paths, as it is intended
 to be run from the root of the project directory.
 """
-import os, sys, subprocess, json, re, time
+import os, sys, subprocess, time, requests
 from src.other.helpers import check_internet_connection
+
+# Have to add this because the BEA changed schema again as of November 14th, 2024
+USE_CACHED_2022_DATA = True  
+
+
 
 if not check_internet_connection():
     print(f"--- INIT.PY REQUIRES AN INTERNET CONNECTION TO FUNCTION. SKIPPING ---")
@@ -179,7 +184,7 @@ def fetch_patent_raw_data():
 
     print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}All raw tables downloaded.{Style.RESET_ALL}")
 
-def fetch_bea_raw_tables():
+def fetch_bea_raw_tables_live():
     # Downloads the raw tables from BEA needed to create predictors
     # Paths (modified to be local)
     yearly_income_p      = os.path.join(RAW_DATA_PATH, 'yearly_personal_income_county.csv')
@@ -260,6 +265,63 @@ def fetch_bea_raw_tables():
             if f.startswith('CAINC1') or f.startswith('CAGDP1') or f.startswith('CAINC4') or f.startswith('CAINC30'):
                 os.remove(os.path.join(RAW_DATA_PATH, f))
 
+def download_from_drive(file_id: str, dest: str):
+    """
+    Downloads a file from Google Drive using the file ID.
+
+    Args:
+        file_id (str): The ID of the file to download.
+        dest (str): The destination to save the file.
+    """
+    # Download the file
+    print(f"{Fore.YELLOW}[__init__.py]: Downloading file from Google Drive...{Style.RESET_ALL}")
+    response = requests.get(f"https://drive.google.com/uc?export=download&id={file_id}", stream=True)
+    response.raise_for_status()
+
+    # Save the file
+    with open(dest, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    print(f"{Fore.GREEN}[__init__.py]: File downloaded successfully.{Style.RESET_ALL}")
+
+def fetch_bea_tables_cached():
+    """
+    Gets the tables from the Google Drive links instead.
+    """
+    yearly_income_p      = os.path.join(RAW_DATA_PATH, 'yearly_personal_income_county.csv')
+    yearly_gdp_p         = os.path.join(RAW_DATA_PATH, 'yearly_gdp_county.csv')
+    yearly_employment_p  = os.path.join(RAW_DATA_PATH, 'yearly_employment_county.csv')
+    yearly_more_county_p = os.path.join(RAW_DATA_PATH, 'yearly_more_county_info.csv')
+
+    print(f"\n{Style.BRIGHT}{Fore.CYAN}--- DOWNLOADING RAW BEA TABLES ---{Style.RESET_ALL}")
+
+    if not os.path.exists(yearly_income_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}yearly_personal_income_county.csv{Style.NORMAL}...{Style.RESET_ALL}")
+        download_from_drive("1YaASDC8JE9W3R22qT8o5pKQO4hWu3Cqf", yearly_income_p)
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}yearly_personal_income_county.csv already exists.{Style.RESET_ALL}")
+
+    if not os.path.exists(yearly_gdp_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}yearly_gdp_county.csv{Style.NORMAL}...{Style.RESET_ALL}")
+        download_from_drive("14zxGVL-TUwAZM3fSFSJl1esHA_nHERri", yearly_gdp_p)
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}yearly_gdp_county.csv already exists.{Style.RESET_ALL}")
+
+    if not os.path.exists(yearly_employment_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}yearly_employment_county.csv{Style.NORMAL}...{Style.RESET_ALL}")
+        download_from_drive("1PFcY6sNsgiXeMXqm4moQJYOhaGCoLSWb", yearly_employment_p)
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}yearly_employment_county.csv already exists.{Style.RESET_ALL}")
+
+    if not os.path.exists(yearly_more_county_p):
+        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}yearly_more_county_info.csv{Style.NORMAL}...{Style.RESET_ALL}")
+        download_from_drive("1BN89Y9gKDGcSz82dbZ69ba8xDTiRQyHT", yearly_more_county_p)
+    else:
+        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}yearly_more_county_info.csv already exists.{Style.RESET_ALL}")
+
+    print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}All BEA tables downloaded.{Style.RESET_ALL}")
+
 def fetch_helper_tables():
     county_boundaries_p = os.path.join(RAW_DATA_PATH, '..', 'geolocation', 'county_boundaries.geojson')
 
@@ -277,7 +339,10 @@ def fetch_helper_tables():
 
 
 fetch_patent_raw_data()
-fetch_bea_raw_tables()
+if USE_CACHED_2022_DATA:
+    fetch_bea_tables_cached()
+else:
+    fetch_bea_raw_tables_live()
 fetch_helper_tables()
 
 print(f"\n{Style.BRIGHT}{Fore.GREEN}[__init__.py]: Initialization complete.{Style.RESET_ALL}")
