@@ -63,22 +63,17 @@ def ensure_directory_exists(dir: str):
 if not os.path.exists("data"):
     ensure_directory_exists("data")
     ensure_directory_exists("data/geolocation")
-    ensure_directory_exists("data/census")
     ensure_directory_exists("data/bea")
     ensure_directory_exists("data/raw")
     ensure_directory_exists("data/model")
 if not os.path.exists("data/geolocation"):
     ensure_directory_exists("data/geolocation")
-if not os.path.exists("data/census"):
-    ensure_directory_exists("data/census")
 if not os.path.exists("data/bea"):
     ensure_directory_exists("data/bea")
 if not os.path.exists("data/raw"):
     ensure_directory_exists("data/raw")
 if not os.path.exists("data/model"):
     ensure_directory_exists("data/model")
-if not os.path.exists("config"):
-    ensure_directory_exists("config")
 
 RAW_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "raw")
 
@@ -188,13 +183,13 @@ def fetch_bea_raw_tables():
     # Downloads the raw tables from BEA needed to create predictors
     # Paths (modified to be local)
     yearly_income_p      = os.path.join(RAW_DATA_PATH, 'yearly_personal_income_county.csv')
-    yearly_income_b      = os.path.join(RAW_DATA_PATH, 'CAINC1__ALL_AREAS_1969_2022.csv')
+    yearly_income_b      = os.path.join(RAW_DATA_PATH, 'CAINC1__ALL_AREAS_1969_2023.csv')
     yearly_gdp_p         = os.path.join(RAW_DATA_PATH, 'yearly_gdp_county.csv')
     yearly_gdp_b         = os.path.join(RAW_DATA_PATH, 'CAGDP1__ALL_AREAS_2001_2022.csv')
     yearly_employment_p  = os.path.join(RAW_DATA_PATH, 'yearly_employment_county.csv')
-    yearly_employment_b  = os.path.join(RAW_DATA_PATH, 'CAINC4__ALL_AREAS_1969_2022.csv')
+    yearly_employment_b  = os.path.join(RAW_DATA_PATH, 'CAINC4__ALL_AREAS_1969_2023.csv')
     yearly_more_county_p = os.path.join(RAW_DATA_PATH, 'yearly_more_county_info.csv')
-    yearly_more_county_b = os.path.join(RAW_DATA_PATH, 'CAINC30__ALL_AREAS_1969_2022.csv')
+    yearly_more_county_b = os.path.join(RAW_DATA_PATH, 'CAINC30__ALL_AREAS_1969_2023.csv')
 
     def zip_instead(p: str) -> str:
         return p + ".zip"
@@ -266,18 +261,9 @@ def fetch_bea_raw_tables():
                 os.remove(os.path.join(RAW_DATA_PATH, f))
 
 def fetch_helper_tables():
-    fips_converter_p    = os.path.join(RAW_DATA_PATH, '..', 'census', 'fips_to_county.tsv')
     county_boundaries_p = os.path.join(RAW_DATA_PATH, '..', 'geolocation', 'county_boundaries.geojson')
 
     print(f"\n{Style.BRIGHT}{Fore.CYAN}--- DOWNLOADING HELPER TABLES ---{Style.RESET_ALL}")
-
-    if not os.path.exists(fips_converter_p):
-        print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}fips_to_county.tsv{Style.NORMAL}...{Style.RESET_ALL}")
-        os_specific_download("https://raw.githubusercontent.com/ChuckConnell/articles/refs/heads/master/fips2county.tsv", fips_converter_p)
-
-        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}Downloaded {Style.DIM}fips_to_county.tsv{Style.NORMAL}.{Style.RESET_ALL}")
-    else:
-        print(f"{Fore.GREEN}[__init__.py]: {Style.NORMAL}fips_to_county.tsv already exists.{Style.RESET_ALL}")
 
     if not os.path.exists(county_boundaries_p):
         print(f"\n{Fore.YELLOW}[__init__.py]: Downloading {Style.DIM}county_boundaries.geojson{Style.NORMAL}...{Style.RESET_ALL}")

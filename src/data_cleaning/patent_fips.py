@@ -360,7 +360,6 @@ def add_fips_codes():
     
     # Add county information
     logger.info("Adding county information to patents...")
-    #df = add_county_info_single(df, rtree_idx, county_polygons)
     df = add_county_info_parallel(df, rtree_idx, county_polygons, batch_size=500)
     
     # Save final results

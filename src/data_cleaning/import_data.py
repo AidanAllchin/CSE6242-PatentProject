@@ -130,6 +130,7 @@ simplify_assignees()
 #                                                                             #
 ###############################################################################
 
+
 def convert_ids():
     # Assure all ids are string type is there is no issue when merging
     patents_g.loc[:, 'patent_id']       = patents_g['patent_id'].astype('string')
@@ -235,6 +236,14 @@ logger.info("\nMerging WIPO data with patent data. Estimated completion time: {}
 
 # Merge to get WIPO type for each patent (~10s)
 df = pd.merge(df_no_wipo, wipo_g, on='patent_id', how='left')
+
+
+###############################################################################
+#                                                                             #
+#                                  Cleaning                                   #
+#                                                                             #
+###############################################################################
+
 
 # Drop the few remaining columns we don't need
 df = df.drop(columns=['wipo_field_sequence', 'wipo_field_id', 'wipo_kind'])

@@ -35,10 +35,6 @@ from src.other.helpers import get_coordinates_for_city, local_filename, completi
 # Initialize logger
 logger = PatentLogger.get_logger(__name__)
 
-with open(os.path.join(project_root, "config", "config.json"), "r") as f:
-    config = json.load(f)
-
-USPTO_API_KEY      = config["uspto_key"]
 LOCATIONS_TSV_PATH = os.path.join(project_root, 'data', 'geolocation', 'city_coordinates.tsv')
 CORRECTIONS_PATH   = os.path.join(project_root, 'data', 'geolocation', 'location_corrections.tsv')
 PATENTS_PATH       = os.path.join(project_root, 'data', 'processed_patents.tsv')
@@ -54,6 +50,9 @@ def add_coordinates():
     """
     For every patent in the list, add the latitude and longitude of the assignee
     and inventor locations.
+
+    Relies on the cache of city coordinates. If the cache does not exist, it will
+    be created, which takes a long time.
     """
     # Ensure the patents file exists
     if not os.path.exists(PATENTS_PATH):
@@ -75,7 +74,7 @@ def add_coordinates():
 
     if not os.path.exists(CORRECTIONS_PATH):
         logger.error("Location corrections file not found at {}. Creating corrections...".format(local_filename(CORRECTIONS_PATH)))
-        i = input("Are you sure you want to continue without location corrections? (y/n): ")
+        i = input("Are you sure you want to continue generating location corrections? (y/n): ")
         if i.lower() != 'y':
             logger.error("Exiting...", level="ERROR")
             sys.exit(1)
@@ -91,20 +90,25 @@ def add_coordinates():
 
     # Drop all remaining patents with locations of 0.0 for latitude and longitude
     # in either the inventor or assignee locations
-    patents = pd.read_csv(FINAL_PATENTS_PATH, sep='\t')
-    num_patents = len(patents)
-    patents = patents[(patents['inventor_latitude'] != 0.0) & (patents['inventor_longitude'] != 0.0)]
-    patents = patents[(patents['assignee_latitude'] != 0.0) & (patents['assignee_longitude'] != 0.0)]
+    patents       = pd.read_csv(FINAL_PATENTS_PATH, sep='\t')
+    num_patents   = len(patents)
+    patents       = patents[(patents['inventor_latitude'] != 0.0) & (patents['inventor_longitude'] != 0.0)]
+    patents       = patents[(patents['assignee_latitude'] != 0.0) & (patents['assignee_longitude'] != 0.0)]
     num_remaining = len(patents)
-    num_removed = num_patents - num_remaining
+    num_removed   = num_patents - num_remaining
     patents.to_csv(FINAL_PATENTS_PATH, sep='\t', index=False)
+
     logger.info(f"Removed {num_removed} patents with 0.0 for latitude and longitude in either inventor or assignee locations.")
     logger.info(f"Lost {num_removed / num_patents * 100:.2f}% of patents due to missing coordinates.")
 
-def create_city_coordinates_cache(patents: pd.DataFrame) -> None:
+def create_city_coordinates_cache(patents: pd.DataFrame):
     """
     Create a cache of city coordinates by iterating over all patents and
     collecting the latitude and longitude of each city.
+
+    This is a pretty messy function, and if I had more time would try to batch
+    the requests to the geolocation API and handle asynchronously. As it stands,
+    this function takes a long time to run.
 
     Args:
         patents (pd.DataFrame): The pandas DataFrame containing all the patents
@@ -156,7 +160,7 @@ def create_city_coordinates_cache(patents: pd.DataFrame) -> None:
 
     # Create or update the cache of city coordinates
     failed_counter = 0
-    mode = 'a' if os.path.exists(LOCATIONS_TSV_PATH) else 'w' # Don't want to overwrite if she already exists
+    mode = 'a' if os.path.exists(LOCATIONS_TSV_PATH) else 'w'  # Don't want to overwrite if she already exists
     with open(LOCATIONS_TSV_PATH, mode, newline='', encoding='utf-8') as f:
         if mode == 'w':
             f.write("city\tcountry\tstate\tlatitude\tlongitude\n")
@@ -499,12 +503,13 @@ def drop_unusable():
         return
 
     # Read the patents file
-    patents = pd.read_csv(FINAL_PATENTS_PATH, sep='\t')
-    num_patents = len(patents)
-    patents = patents[patents['inventor_fips'].notnull()]
+    patents       = pd.read_csv(FINAL_PATENTS_PATH, sep='\t')
+    num_patents   = len(patents)
+    patents       = patents[patents['inventor_fips'].notnull()]
     num_remaining = len(patents)
-    num_removed = num_patents - num_remaining
+    num_removed   = num_patents - num_remaining
     patents.to_csv(FINAL_PATENTS_PATH, sep='\t', index=False)
+    
     logger.info("Removed {} patents without a FIPS code for the inventor.".format(num_removed))
     logger.info("Lost {:.2f}% of patents due to missing FIPS codes.".format(num_removed / num_patents * 100))
 

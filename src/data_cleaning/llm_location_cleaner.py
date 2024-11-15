@@ -4,7 +4,7 @@
 Created: Thu Nov 07 2024
 Author: Aidan Allchin
 
-This script uses Ollama with llama2-3:11b to clean and correct location data
+This script uses Ollama with qwen2.5:32b to clean and correct location data
 from our patent tsv file. It processes locations with missing coordinates due 
 to misspellings, typos, etc. and saves a best guess for the correct state, 
 city, and country. The mapping between original state, city, and country and
@@ -30,7 +30,6 @@ import json
 import time
 import asyncio
 from datetime import datetime
-from tqdm import tqdm
 import ollama
 from typing import List, Dict, Tuple, Optional
 from src.other.logging import PatentLogger
@@ -58,7 +57,7 @@ loaded_model = None
 
 class ProcessingMetrics:
     # This is more so I can keep track of how long this is taking and whether
-    # it's even worth attempting/if I should hire this out.
+    # it's even worth attempting/if I should hire this out to runpod or something
     def __init__(self):
         self.start_time          = datetime.now()
         self.batch_times         = []
@@ -154,7 +153,7 @@ class LocationCleaner:
         enabled = "enabled" if diagnostics else "disabled"
         logger.info(f"Initialized LocationCleaner with input: {local_filename(input_tsv)}")
         logger.info(f"Output: {local_filename(output_tsv)}")
-        logger.info(f"Metrics = {enabled}", color=Fore.LIGHTBLUE_EX)
+        logger.info(f"Metrics = {enabled}")
 
     def load_model(self, model_name: str = PREFERRED_MODEL) -> bool:
         """
@@ -322,23 +321,14 @@ Example response format:
             {"role": "system", "content": self.create_system_prompt()},
             {"role": "user", "content": self.create_user_prompt(locations)}
         ]
-
-        #start_time = datetime.now()
         
         try:
-            #print("Raw Request:")
-            #print(messages)
-
             response = await self.client.chat(
                 model=model_name,
                 messages=messages,
                 format="json",
                 options={"temperature": temp}
             )
-            #print("Raw Response:")
-            #print(json.loads(response['message']['content']))
-
-            #log(f"Output generated in {datetime.now() - start_time}.", color=Fore.LIGHTMAGENTA_EX)
 
             try:
                 corrections = response['message']['content']
@@ -351,30 +341,9 @@ Example response format:
                 corrections = corrections['locations']
 
                 result = {}
-
-                #print(type(corrections))
-                #print(corrections)
-                
-                # Handle both single dictionary and list of dictionaries
-                # (possible if batch size is 1)
-                # if isinstance(corrections, dict):
-                #     # Single correction
-                #     original  = corrections.get('original')
-                #     corrected = corrections.get('corrected')
-                    
-                #     #log(f"Single correction - Original: {original}, Corrected: {corrected}")
-                    
-                #     if (isinstance(original, (list, tuple)) and len(original) == 3 and 
-                #         isinstance(corrected, (list, tuple)) and len(corrected) == 3):
-                #         # Always store with lowercase key and properly capitalized value
-                #         key = tuple(str(x).lower() for x in original)
-                #         result[key] = tuple(corrected)
                 
                 if isinstance(corrections, list):
-                    #print("List of corrections")
-                    # List of corrections
                     for correction in corrections:
-                        #log(f"Correction: {correction}")
                         if not isinstance(correction, dict):
                             logger.warning(f"Skipping invalid correction format: {correction}")
                             continue

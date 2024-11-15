@@ -38,7 +38,7 @@ gdp_p        = os.path.join(DATA_FOLDER, 'raw', 'yearly_gdp_county.csv')
 income_p     = os.path.join(DATA_FOLDER, 'raw', 'yearly_personal_income_county.csv')
 more_info_p  = os.path.join(DATA_FOLDER, 'raw', 'yearly_more_county_info.csv')
 
-DATE_CUTOFF  = 2001  # Only include data from this date onwards
+DATE_CUTOFF  = 2001  # Only include data starting from new GDP calculation method
 
 
 ###############################################################################
@@ -57,12 +57,11 @@ def gather_employment_df() -> Dict[int, pd.DataFrame]:
     4. Filters rows based on specific 'Description' values of interest.
     5. Creates a DataFrame for each year, with one row per county (FIPS) and columns based on 'Description' values.
     6. Renames columns to be more descriptive.
-    7. Returns a dictionary of DataFrames, keyed by year.
+    7. Returns dict of DataFrames, keyed by year.
 
     Returns:
         Dict[int, pd.DataFrame]: A dictionary of DataFrames, each representing data for a specific year.
     """
-    # GeoFIPS,GeoName,Region,TableName,LineCode,IndustryClassification,Description,Unit,1969,1970,1971,1972,1973,1974,1975,1976,1977,1978,1979,1980,1981,1982,1983,1984,1985,1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022
     df = pd.read_csv(employment_p, encoding='latin1')
     df = df.dropna(subset=['GeoFIPS'])
     df = df.dropna(subset=['GeoName'])
@@ -111,16 +110,14 @@ def gather_employment_df() -> Dict[int, pd.DataFrame]:
         year_df['residence_net_earnings_thousands'] = year_df['residence_net_earnings_thousands'].replace('(NA)', np.nan)
         year_df['residence_net_earnings_thousands'] = year_df['residence_net_earnings_thousands'].astype(float)
 
+        # Make things per capita
         year_df['employment_per_capita'] = year_df['total_employment_count'] / year_df['population_count']
         year_df['earnings_per_capita'] = year_df['residence_net_earnings_thousands'] / year_df['population_count']
         year_df = year_df.drop(columns=['total_employment_count', 'residence_net_earnings_thousands'])
 
-        # Remove the index
         year_df = year_df.reset_index(drop=True)
-
         dfs[year] = year_df
     
-    # Return the list of dataframes
     return dfs
 
 def gather_gdp_df() -> Dict[int, pd.DataFrame]:
@@ -140,12 +137,11 @@ def gather_gdp_df() -> Dict[int, pd.DataFrame]:
     Returns:
         Dict[int, pd.DataFrame]: A dictionary where keys are years and values are DataFrames containing GDP data for that year.
     """
-    #GeoFIPS,GeoName,Region,TableName,LineCode,IndustryClassification,Description,Unit,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022
     df = pd.read_csv(gdp_p, encoding='latin1')
     df = df.dropna(subset=['GeoFIPS'])
     df = df.dropna(subset=['GeoName'])
 
-    # Drop columns that are not needed
+    # Drop columns we don't need
     df = df.drop(columns=['Region', 'TableName', 'LineCode', 'IndustryClassification', 'Unit'])
 
     # Drop description values we don't care about as predictors
@@ -200,7 +196,6 @@ def get_more_info_df() -> Dict[int, pd.DataFrame]:
     Returns:
         Dict[int, pd.DataFrame]: A dictionary of DataFrames, each representing data for a specific year.
     """
-    # GeoFIPS,GeoName,Region,TableName,LineCode,IndustryClassification,Description,Unit,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022
     df = pd.read_csv(more_info_p, encoding='latin1')
     df = df.dropna(subset=['GeoFIPS'])
     df = df.dropna(subset=['GeoName'])
@@ -243,46 +238,6 @@ def get_more_info_df() -> Dict[int, pd.DataFrame]:
     # Return the list of dataframes
     return dfs
 
-# def scale_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
-#     """
-#     Scales a specified column in a DataFrame using robust scaling methods while handling NAs intelligently.
-
-#     The function performs the following steps:
-#     1. Converts '(NA)' strings to numpy NaN values.
-#     2. Converts the column to float type, preserving NaN values.
-#     3. Applies a log transformation to columns representing counts or populations.
-#     4. Uses robust scaling for financial metrics.
-#     5. Scales only the non-NA values in the column.
-    
-#     Args:
-#         df (pd.DataFrame): The input DataFrame containing the data.
-#         column (str): The name of the column to be scaled.
-
-#     Returns:
-#         pd.DataFrame: The DataFrame with the specified column scaled.
-        
-#     """
-#     # Convert (NA) strings to numpy NaN
-#     df[column] = df[column].replace('(NA)', np.nan)
-    
-#     # Convert to float (this will preserve NaN values)
-#     df[column] = df[column].astype(float)
-    
-#     # For columns representing counts/populations, use log transformation
-#     if any(x in column for x in ['count', 'population']):
-#         # Add small constant to handle zeros
-#         df[column] = np.log1p(df[column])
-    
-#     # For financial metrics, use robust scaling
-#     from sklearn.preprocessing import RobustScaler
-#     scaler = RobustScaler()
-    
-#     # Only scale non-NA values
-#     mask = df[column].notna()
-#     df.loc[mask, column] = scaler.fit_transform(df.loc[mask, column].values.reshape(-1, 1))
-    
-#     return df
-
 def collect_bea_predictors():
     dest_path = os.path.join(DATA_FOLDER, 'bea')
     if not os.path.exists(dest_path):
@@ -291,11 +246,6 @@ def collect_bea_predictors():
     employment_dfs = gather_employment_df()
     gdp_dfs        = gather_gdp_df()
     more_info_dfs  = get_more_info_df()
-
-    # Scale each column appropriately
-    # columns_to_scale = ['average_earnings_per_job_dollars', 'real_gdp_thousands',
-    #             'per_capita_income_dollars', 'employment_per_capita',
-    #             'earnings_per_capita', 'population_count']
 
     # Merge all the dataframes together
     dfs = []
@@ -307,9 +257,6 @@ def collect_bea_predictors():
 
         # Remove state-level aggregates for county analysis
         df = df[~df['GeoFIPS'].str.strip("\"").str.endswith('000')]
-
-        # for column in columns_to_scale:
-        #     df = scale_column(df, column)
 
         dfs.append(df)
 

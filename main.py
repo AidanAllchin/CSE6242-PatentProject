@@ -64,7 +64,7 @@ def get_patent_data():
         return
     else:
         logger.warning("Please consider downloading the patent data and placing it in the appropriate directory.")
-        logger.warning("Running this script as an alternative will day upwards of 24 hours.")
+        logger.warning("Running this script to completion can take upwards of 24 hours.")
         i = input("Continue? (y/n): ")
         if i.lower() != "y":
             return
@@ -80,6 +80,10 @@ def get_patent_data():
     add_fips_codes()
     drop_unusable()
 
+    # Remove inital intermediary file
+    if os.path.exists(os.path.join(PATENTS_DIRECTORY, '..', 'processed_patents.tsv')):
+        os.remove(os.path.join(PATENTS_DIRECTORY, '..', 'processed_patents.tsv'))
+
 def get_bea_data():
     """
     Downloads and creates a .tsv with the Bureau of Economic Analysis data
@@ -88,7 +92,6 @@ def get_bea_data():
     Should result in a `<root>/data/bea/bea_predictors.tsv` file.
     """
     try:
-        # TODO: Waiting for Kaitlyn to finish
         subprocess.run(["python3", "src/data_cleaning/bea_data.py"], check=True)
         print()
     except subprocess.CalledProcessError as e:
@@ -102,22 +105,20 @@ def get_census_data():
     Should result in a `<root>/data/census/census_predictors.tsv` file.
     """
     try:
-        # TODO: Waiting for Kaitlyn to finish
         subprocess.run(["python3", "src/data_cleaning/census_data.py"], check=True)
         print()
     except subprocess.CalledProcessError as e:
         print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `census_data.py`: {e}{Style.RESET_ALL}\n")
 
-def get_fed_data():
+def get_fred_data():
     """
     Downloads and creates a .tsv with the Federal data
     organized by county and grouped by time period.
 
-    Should result in a `<root>/data/fed/fed_predictors.tsv` file.
+    Should result in a `<root>/data/fred/fred_predictors.tsv` file.
     """
     try:
-        # TODO: Waiting for Kaitlyn to finish
-        subprocess.run(["python3", "src/data_cleaning/fed_data.py"], check=True)
+        subprocess.run(["python3", "src/data_cleaning/fred_data.py"], check=True)
         print()
     except subprocess.CalledProcessError as e:
         print(f"{Style.BRIGHT}{Fore.RED}\n[system]: {Style.NORMAL}Failed to run `fed_data.py`: {e}{Style.RESET_ALL}\n")
@@ -155,7 +156,7 @@ def display_menu():
     print("1. ETL patent data")
     print("2. ETL BEA data")
     print("3. [Unused] ETL census data")
-    print("4. [Unused] ETL Fed data")
+    print("4. [Unused] ETL Fred data")
     print("5. Generate Innovation Hub Predictor Model (IHPM) variables")
     print("6. Train IHPM and generate county-level predictions")
     print("0. Exit\n")
@@ -181,21 +182,15 @@ def main():
             #get_census_data()
         elif option == "4":
             print(f"{Style.BRIGHT}{Fore.RED}Warning: This isn't used.{Style.RESET_ALL}")
-            #get_fed_data()
+            #get_fred_data()
         elif option == "5":
             if not os.path.exists(CLEANED_PATENTS_PATH) or os.path.getsize(CLEANED_PATENTS_PATH) == 0:
                 logger.error("Cleaned patents file doesn't exists. Please run step 1 or download the file.")
                 continue
             num_files = len([f for f in os.listdir(BEA_DATA_PATH) if os.path.isfile(os.path.join(BEA_DATA_PATH, f))])
             if not num_files or num_files == 0:
-                logger.error("BEA predictors file doesn't exists. Please run step 2 first.")
+                logger.error("BEA predictor files don't exist. Please run step 2 first.")
                 continue
-            # if not os.path.exists(CENSUS_DATA_PATH) or os.path.getsize(CENSUS_DATA_PATH) == 0:
-            #     logger.error("Census predictors file doesn't exists. Please run step 3 first.")
-            #     continue
-            # if not os.path.exists(FED_DATA_PATH) or os.path.getsize(FED_DATA_PATH) == 0:
-            #     logger.error("Fed predictors file doesn't exists. Please run step 4 first.")
-            #     continue
 
             # If everything we need exists, run it
             create_model_predictors()

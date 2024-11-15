@@ -35,7 +35,7 @@ from src.other.logging import PatentLogger
 logger = PatentLogger.get_logger(__name__)
 
 DATA_FOLDER    = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'census')
-NAME_TO_FIPS   = os.path.join(DATA_FOLDER, 'fips_to_county.tsv')
+os.makedirs(DATA_FOLDER, exist_ok=True)
 CENSUS_API_KEY = '29e0fb5c56cb38bb77a95450557344c1e217e72f'
 
 

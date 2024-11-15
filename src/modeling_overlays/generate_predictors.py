@@ -10,6 +10,30 @@ the number of patents, inventors, assignees, unique WIPO fields, diversity score
 and exports score for each county. The BEA data is used to calculate an innovation
 score for each county. The predictors are saved to TSV files in the `data/model`
 folder.
+
+Flow:
+1. Load patent data and BEA data for each year
+2. Calculate patent-based predictors for each year:
+    - Number of patents
+    - Number of inventors
+    - Number of assignees
+    - Number of unique WIPO fields
+    - Diversity score = Shannon Diversity Index of WIPO fields
+    - Exports score = Number of patents with assignee outside inventor's county
+3. Add population count to each year's predictors
+4. Scale and normalize the predictors
+5. Calculate innovation score for each year:
+    - Innovation score = (
+        0.3 * per_capita_income_dollars +
+        0.2 * earnings_per_capita +
+        0.2 * employment_per_capita +
+        0.4 * real_gdp_thousands +
+        0.1 * average_earnings_per_job_dollars
+    )
+6. Add temporal metrics to each year's predictors:
+    - Population percentage change
+    - Economic momentum (relative change in GDP per capita)
+7. Save predictors to TSV files in the `data/model` folder
 """
 import os, sys
 from pathlib import Path
@@ -29,7 +53,7 @@ from sklearn.preprocessing import RobustScaler
 from typing import List
 from datetime import datetime
 from src.other.logging import PatentLogger
-from src.other.helpers import local_filename
+
 
 ###############################################################################
 #                               CONFIGURATION                                 #
@@ -219,7 +243,6 @@ def calculate_patent_features(patent_df: pd.DataFrame, period_start: datetime, p
     """
     st = time.time()
     loading_start = time.time()
-    #patent_df['patent_date'] = pd.to_datetime(patent_df['patent_date'])
 
     # Fill missing FIPS codes with 0 (there shouldn't be any, at least for inventors)
     patent_df['inventor_fips'] = patent_df['inventor_fips'].fillna(0).astype(int)
@@ -264,8 +287,20 @@ def calculate_patent_features(patent_df: pd.DataFrame, period_start: datetime, p
 
     logger.info(f"Generated features in {time.time() - features_start:.2f}s")
     
-    # Diversity Score: Evenness of WIPO field distribution (Shannon Diversity Index)
     def shannon_diversity(group):
+        """
+        Calculate the Shannon diversity index for a given group.
+
+        The Shannon diversity index is a measure of the diversity in a dataset. 
+        It accounts for both the abundance and evenness of the categories present.
+
+        Args:
+            group (pd.DataFrame): A pandas DataFrame containing a column 'wipo_field_title' 
+                              which represents the categories to calculate the diversity for.
+
+        Returns:
+            float: The Shannon diversity index. A higher value indicates greater diversity.
+        """
         counts = group['wipo_field_title'].value_counts()
         proportions = counts / counts.sum()
         score = -sum(proportions * np.log(proportions)) if not counts.empty else 0
@@ -278,8 +313,16 @@ def calculate_patent_features(patent_df: pd.DataFrame, period_start: datetime, p
     features['diversity_score'] = (features['diversity_score'] - features['diversity_score'].min()) / (features['diversity_score'].max() - features['diversity_score'].min())
     logger.info(f"Calculated diversity score in {time.time() - div_start:.2f}s")
     
-    # Exports score: Number of patents where the assignee is not in the same county as the inventor
     def exports_score(group):
+        """
+        Number of patents where assignee isn't the same county as inventor.
+
+        Args:
+            group (pd.DataFrame): Group of patents for a given inventor
+
+        Returns:
+            int: Number of patents where assignee isn't the same county as inventor
+        """
         return group['assignee_fips'].nunique()
     
     exports_start = time.time()
@@ -509,6 +552,12 @@ def calculate_county_modifiers(yearly_predictors: List[pd.DataFrame]) -> pd.Seri
     Calculate a modifier for each county based on its historical innovation performance
     relative to the global average. This captures the inherent "innovation potential"
     of each county while accounting for temporal trends.
+
+    This value does a lot of the heavy lifting in the model, as it allows us to remove
+    the county_fips column and use the modifier as a proxy for the county's innovation
+    potential. I do worry, however, that it might be accounting for too much of the
+    model's performance and causing us to lose some of the patent-specific predictors'
+    predictive power.
     
     The modifier is calculated as a combination of:
     1. Historical average innovation score relative to global mean
@@ -516,10 +565,10 @@ def calculate_county_modifiers(yearly_predictors: List[pd.DataFrame]) -> pd.Seri
     3. Innovation score stability (inverse of variance)
     
     Args:
-        yearly_predictors: List of DataFrames containing predictors for each year
+        yearly_predictors (List[pd.DataFrame]): List of DataFrames containing predictors for each year
         
     Returns:
-        Series with county_fips as index and modifier as values
+        pd.Series with county_fips as index and modifier as values
     """
     # Combine all years
     all_data = pd.concat(yearly_predictors)[['county_fips', 'year', 'innovation_score']]
@@ -537,8 +586,11 @@ def calculate_county_modifiers(yearly_predictors: List[pd.DataFrame]) -> pd.Seri
         if len(county_data) < 2:  # Need at least 2 years for meaningful metrics
             county_metrics[county] = 1.0  # Neutral modifier for counties with insufficient data
             continue
-            
-        # 1. Relative Performance (z-score)
+
+        ###  
+        # Relative Performance (z-score)
+        ###
+
         county_mean = county_data['innovation_score'].mean()
         relative_performance = (county_mean - global_mean) / global_std
 
@@ -546,18 +598,25 @@ def calculate_county_modifiers(yearly_predictors: List[pd.DataFrame]) -> pd.Seri
         relative_performance = 1 + (relative_performance / 5)  # dampen extreme values
         relative_performance = np.clip(relative_performance, 0.5, 1.5)
         
-        # 2. Growth Rate
+        ###
+        # Growth Rate
+        ###
+        
         growth_rates = county_data['innovation_score'].pct_change().dropna()
         if len(growth_rates) > 0:
-            # Use median instead of mean for robustness
+            # Using median because outliers have been a problem
             avg_growth = np.median(growth_rates)
-            # Convert to a 0.8-1.2 range
-            growth_component = 1 + (avg_growth * 0.2)  # Scale factor of 0.2 to dampen
+
+            # Convert to a 0.8-1.2 range and dampen extreme values
+            growth_component = 1 + (avg_growth * 0.2)
             growth_component = np.clip(growth_component, 0.8, 1.2)
         else:
             growth_component = 1.0
         
-        # 3. Stability (redesigned)
+        ###
+        # Stability
+        ###
+
         if len(county_data) >= 3:  # Need at least 3 points for meaningful stability
             # Use coefficient of variation (CV) with protection against zero mean
             mean_score = county_data['innovation_score'].mean()
@@ -595,12 +654,6 @@ def calculate_county_modifiers(yearly_predictors: List[pd.DataFrame]) -> pd.Seri
     logger.info(f"  Max:  {modifiers.max():.3f}")
     logger.info(f"  Number of counties: {len(modifiers)}")
     
-    # Log distribution in bins
-    bins = pd.cut(modifiers, bins=10)
-    logger.info("\nModifier distribution:")
-    for bin_label, count in bins.value_counts().sort_index().items():
-        logger.info(f"  {bin_label}: {count}")
-    
     return modifiers
 
 def add_county_modifiers(training_data: pd.DataFrame, yearly_predictors: List[pd.DataFrame]) -> pd.DataFrame:
@@ -632,9 +685,6 @@ def add_county_modifiers(training_data: pd.DataFrame, yearly_predictors: List[pd
     modifiers.reset_index().rename(columns={'index': 'county_fips', 0: 'county_modifier'}).to_csv(
         modifier_path, sep='\t', index=False
     )
-    
-    # We actually do want this still
-    #training_data = training_data.drop(columns=['county_fips'])
     
     return training_data
 

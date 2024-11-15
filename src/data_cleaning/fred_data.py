@@ -5,7 +5,7 @@ Created: Sun Nov 12 2024
 Author: Kaitlyn Williams
 
 Gathers relevant fed data for each county we have patent data in, and 
-saves each year to the /data/fed directory as a tsv.
+saves each year to the /data/fred directory as a tsv.
 """
 import os, sys
 from pathlib import Path
@@ -34,7 +34,8 @@ from src.other.logging import PatentLogger
 logger = PatentLogger.get_logger(__name__)
 
 # For access to data here, just do f"{DATA_FOLDER}/and then whatever file name you want"
-DATA_FOLDER  = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'fed')
+DATA_FOLDER  = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'fred')
+os.makedirs(DATA_FOLDER, exist_ok=True)  # This isn't created in __init__.py
 FRED_API_KEY = '51fbd42a3ad7fc528dd32ac27499a7ee'
 
 
