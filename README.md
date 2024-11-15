@@ -1,10 +1,8 @@
 # CSE6242-PatentProject
 
-GitHub repo for our project.
-
 ## Details
 
-### Data Used
+### Data Used (Automatic)
 
 Note that **manual downloading of these files is not required**. Multiple files require specific file locations and naming conventions, so `__init__.py` (and by extension, `main.py`) will download, rename, and move these files automatically to ensure consistency.
 
@@ -15,12 +13,23 @@ Note that **manual downloading of these files is not required**. Multiple files 
 | **USPTO**  | `g_location_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_location_not_disambiguated.tsv.zip |
 | **USPTO**  | `g_assignee_not_disambiguated` | https://s3.amazonaws.com/data.patentsview.org/download/g_assignee_not_disambiguated.tsv.zip |
 | **USPTO**  |      `g_wipo_technology`       | https://s3.amazonaws.com/data.patentsview.org/download/g_wipo_technology.tsv.zip            |
-|  **BEA**   | `CAINC1__ALL_AREAS_1969_2022`  | https://apps.bea.gov/regional/zip/CAINC1.zip                                                |
+|  **BEA**   | `CAINC1__ALL_AREAS_1969_2023`  | https://apps.bea.gov/regional/zip/CAINC1.zip                                                |
 |  **BEA**   | `CAGDP1__ALL_AREAS_2001_2022`  | https://apps.bea.gov/regional/zip/CAGDP1.zip                                                |
-|  **BEA**   | `CAINC4__ALL_AREAS_1969_2022`  | https://apps.bea.gov/regional/zip/CAINC4.zip                                                |
-|  **BEA**   | `CAINC30__ALL_AREAS_1969_2022` | https://apps.bea.gov/regional/zip/CAINC30.zip                                               |
-| **Census** |     `fips_to_county_name`      | https://raw.githubusercontent.com/ChuckConnell/articles/refs/heads/master/fips2county.tsv   |
+|  **BEA**   | `CAINC4__ALL_AREAS_1969_2023`  | https://apps.bea.gov/regional/zip/CAINC4.zip                                                |
+|  **BEA**   | `CAINC30__ALL_AREAS_1969_2023` | https://apps.bea.gov/regional/zip/CAINC30.zip                                               |
 | **Census** |  `county_boundaries.geojson`   | https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/us-county-boundaries/exports/geojson?lang=en&timezone=America%2FNew_York |
+
+### Data Used (Manual)
+
+THe following tables should be downloaded manually and placed in their respective directories unless you wish to run the full pipeline (including running a 32B-parameter LLM locally), which can take >24 hours or simply be impossible depending on your device.
+
+You can generate the third file using the first two files, or can download all three and jump straight to generating the BEA features and training the model.
+
+| **Link** | **File Location** | **Size (MB)** | **Time to Generate (hr)** | **Requires LLM** |
+| https://drive.google.com/file/d/178rhI4UhdwRtPUNkZPrOhQRl5pVFtL1f/view?usp=drive_link | `CSE6242-PatentProject/data/geolocation/` | 1.4 | 6  | n |
+| https://drive.google.com/file/d/1NPTZyfcBFptAvhmcSngn_Fo8VhfT9Gi-/view?usp=drive_link | `CSE6242-PatentProject/data/geolocation/` | 0.8 | 10 | y |
+| https://drive.google.com/file/d/18AX7vQeApAuCK2KgTLUACeJf36D2Band/view?usp=drive_link | `CSE6242-PatentProject/data/` | 913.6 | 0.4 | n |
+
 
 ## Installation and Setup
 
@@ -76,5 +85,12 @@ This script will:
 - **Menu Item 4:** (Unused) Load Fed data
 - **Menu Item 5:** Group patents and create model metrics organized by time window and county
 - **Menu Item 5:** Create predictors and `innovation_score` for the Innovation Hub Predictor
-- **Menu Item 6:** WIP: Train IHPM and predict next period innovation score for all counties for overlay
-- **Menu Item 6:** WIP: Add latitude and longitude for the predicted values back to the data for the overlay
+- **Menu Item 6:** Train IHPM and predict next period innovation score for all counties for overlay
+- **Menu Item 6:** Add latitude and longitude for the predicted values back to the data for the overlay
+
+
+## Known Issues
+
+The BEA tables downloaded in `__init__.py` have updated since starting the project. I've fixed the links for 3 of the 4, but `CAGDP1__ALL_AREAS_2001_2022` contains the GDP information per-county (one of our most important metrics) and still hasn't been updated to include 2023 as of November 15th. If the unzipping step fails for that file, change the "2022" in line 188 to "2023".
+
+
