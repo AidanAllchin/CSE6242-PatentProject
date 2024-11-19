@@ -216,6 +216,29 @@ def add_county_metadata(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
+def clean_fips(fips):
+    if pd.isna(fips):
+        return '00000'
+    # Remove any decimal points and trailing zeros
+    fips = str(fips).split('.')[0]
+    # Pad to 5 digits
+    return fips.zfill(5)
+
+def convert_bea_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Convert BEA column from '(NA)' strings to proper float values.
+    
+    Args:
+        df: DataFrame with the column to convert
+        column: Column name to convert
+
+    Returns:
+        DataFrame with the column converted to float
+    """
+    df[column] = df[column].replace('(NA)', np.nan)
+    df[column] = df[column].astype(float)
+    return df[column]
+
 
 ###############################################################################
 #                               PREDICTOR GEN                                 #
@@ -245,12 +268,17 @@ def calculate_patent_features(patent_df: pd.DataFrame, period_start: datetime, p
     loading_start = time.time()
 
     # Fill missing FIPS codes with 0 (there shouldn't be any, at least for inventors)
-    patent_df['inventor_fips'] = patent_df['inventor_fips'].fillna(0).astype(int)
-    patent_df['assignee_fips'] = patent_df['assignee_fips'].fillna(0).astype(int)
+    patent_df['inventor_fips'] = patent_df['inventor_fips'].fillna('00000')
+    patent_df['assignee_fips'] = patent_df['assignee_fips'].fillna('00000')
 
     # Set them to 5-digit strings
     patent_df['inventor_fips'] = patent_df['inventor_fips'].astype(str).str.zfill(5)
     patent_df['assignee_fips'] = patent_df['assignee_fips'].astype(str).str.zfill(5)
+
+    # Clean up FIPS codes
+    patent_df['inventor_fips'] = patent_df['inventor_fips'].apply(clean_fips)
+    patent_df['assignee_fips'] = patent_df['assignee_fips'].apply(clean_fips)
+
 
     period_df = patent_df[
         (pd.to_datetime(patent_df['patent_date']) >= period_start) &
@@ -417,8 +445,30 @@ def add_temporal_metrics(patent_features: pd.DataFrame, bea_features: pd.DataFra
         DataFrame with all features combined including temporal metrics
     """
     temp_start = time.time()
+
+    # Clean up before merge
+    patent_features['county_fips'] = patent_features['county_fips'].apply(clean_fips)
+    bea_features['county_fips'] = bea_features['county_fips'].astype(str).str.zfill(5)
+
+    # Add diagnostics
+    # logger.info(f"Patent features FIPS sample: {patent_features['county_fips'].head()}")
+    # logger.info(f"BEA features FIPS sample: {bea_features['county_fips'].head()}")
+    # logger.info(f"Number of unique FIPS in patent_features: {len(patent_features['county_fips'].unique())}")
+    # logger.info(f"Number of unique FIPS in bea_features: {len(bea_features['county_fips'].unique())}")
+    
     # Merge patent and BEA features
     df = patent_features.merge(bea_features, on='county_fips', how='inner')
+    
+    # More diagnostics
+    # logger.info(f"Number of rows after merge: {len(df)}")
+    # if len(df) == 0:
+    #     logger.error("Merge resulted in empty DataFrame!")
+    #     logger.error(f"Sample of patent_features FIPS: {sorted(patent_features['county_fips'].unique())[:5]}")
+    #     logger.error(f"Sample of bea_features FIPS: {sorted(bea_features['county_fips'].unique())[:5]}")
+
+
+    # Merge patent and BEA features
+    #df = patent_features.merge(bea_features, on='county_fips', how='inner')
     
     # Calculate temporal metrics if previous year exists
     prev_year_path = os.path.join(BEA_FOLDER, f'bea_predictors_{df["year"].iloc[0]-1}.tsv')
@@ -499,16 +549,34 @@ def generate_predictors():
         
         # Load BEA features and combine with temporal metrics
         bea_features = load_bea_features(year)
+
+        # Clean numeric columns in both DataFrames
+        numeric_cols = ['per_capita_income_dollars', 'earnings_per_capita', 
+                       'employment_per_capita', 'real_gdp_thousands', 
+                       'average_earnings_per_job_dollars']
+                       
+        for col in numeric_cols:
+            if col in bea_features.columns:
+                bea_features[col] = bea_features[col].replace('(NA)', np.nan)
+                bea_features[col] = pd.to_numeric(bea_features[col], errors='coerce')
+                logger.info(f"Column {col} unique values: {bea_features[col].unique()[:5]}")
+
         features_df = add_temporal_metrics(patent_features, bea_features)
+
+        # Check for any remaining '(NA)' values
+        for col in features_df.columns:
+            if features_df[col].astype(str).eq('(NA)').any():
+                logger.warning(f"Found '(NA)' values in column {col}")
+                features_df[col] = features_df[col].replace('(NA)', np.nan)
+                features_df[col] = pd.to_numeric(features_df[col], errors='coerce')
+
         predictors.append(features_df)
 
     # Now, however, we do want to scale them as the innovation_score is based on these
     # scaled features
     
     # Combine all years for global scaling
-    logger.info("Fitting global scaler...")
     all_data = pd.concat(predictors)
-    scaler = RobustScaler()
     
     # Define which features to scale
     features_to_scale = [
@@ -517,9 +585,26 @@ def generate_predictors():
         'economic_momentum', 'per_capita_income_dollars', 'earnings_per_capita',
         'employment_per_capita', 'real_gdp_thousands', 'average_earnings_per_job_dollars'
     ]
+
+    # Convert all '(NA)' strings to NaN
+    for col in features_to_scale:
+        if col in all_data.columns:
+            all_data[col] = all_data[col].replace('(NA)', np.nan)
+            all_data[col] = pd.to_numeric(all_data[col], errors='coerce')
+    
+    # Print all the rows containing '(NA)' values
+    logger.info("Rows with NA values:")
+    logger.info(all_data[all_data.isin(['(NA)']).any(axis=1)])
+    
+    # Remove rows where scaling feature NaN
+    all_data = all_data.dropna(subset=features_to_scale, how='all')
+
+    logger.info("Fitting global scaler...")
+    scaler = RobustScaler()
     
     # Fit and save scaler
-    scaler.fit(all_data[features_to_scale])
+    non_nan_mask = ~all_data[features_to_scale].isna().any(axis=1)
+    scaler.fit(all_data[features_to_scale][non_nan_mask])
     joblib.dump(scaler, os.path.join(MODEL_FOLDER, 'feature_scaler.joblib'))
     
     # Scale and calculate innovation scores
